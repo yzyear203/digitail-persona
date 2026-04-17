@@ -109,18 +109,8 @@ export default function DigitalPersonaApp() {
     }
   };
 
-  // 🌟 核心重构：调用豆包 (Volcengine) API
+  // 🌟 核心重构：调用自己的 Vercel 后端接口 (安全全栈模式)
   const callDoubaoAPI = async (promptText, systemInstructionText = null, isJson = false, imageParts = []) => {
-    // 安全读取本地 .env 文件中的密钥，切勿硬编码！
-    const apiKey = import.meta.env.VITE_DOUBAO_API_KEY; 
-    const modelId = import.meta.env.VITE_DOUBAO_MODEL_ID || "doubao-seed-2.0-mini";
-    
-    if (!apiKey) {
-      throw new Error("请在项目根目录的 .env 文件中配置 VITE_DOUBAO_API_KEY");
-    }
-
-    const url = `/api/v3/chat/completions`;
-
     // 构造标准的 OpenAI 消息数组
     let messages = [];
 
@@ -133,7 +123,6 @@ export default function DigitalPersonaApp() {
     let userContent = [];
     if (imageParts.length > 0) {
       userContent.push({ type: "text", text: promptText });
-      // 遍历图片并按照火山引擎规范拼装
       imageParts.forEach(img => {
         userContent.push({
           type: "image_url",
@@ -145,16 +134,13 @@ export default function DigitalPersonaApp() {
       messages.push({ role: "user", content: promptText });
     }
 
-    const payload = {
-      model: modelId,
-      messages: messages,
-      temperature: 0.7
-    };
+    // 🌟 核心修改 1：指向我们在 api/generate.js 里写的后端管家接口
+    const url = `/api/generate`;
 
-    // 如果强制要求输出 JSON，使用标准提示工程
-    if (isJson) {
-      payload.response_format = { type: "json_object" };
-    }
+    // 🌟 核心修改 2：只把组装好的 messages 传给后端，不再传密钥和模型ID
+    const payload = {
+      messages: messages
+    };
 
     const fetchWithRetry = async (retries = 3, delay = 1000) => {
       for (let i = 0; i < retries; i++) {
@@ -162,15 +148,15 @@ export default function DigitalPersonaApp() {
           const response = await fetch(url, { 
             method: "POST", 
             headers: { 
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${apiKey}`
+              "Content-Type": "application/json"
+              // 🌟 核心修改 3：移除了 "Authorization: Bearer ..."，前端彻底交出钥匙！
             }, 
             body: JSON.stringify(payload) 
           });
           
           if (!response.ok) {
             const errData = await response.json();
-            throw new Error(`API 报错: ${errData.error?.message || response.status}`);
+            throw new Error(`后端 API 报错: ${errData.error || response.status}`);
           }
           return await response.json();
         } catch (e) {
@@ -247,7 +233,7 @@ export default function DigitalPersonaApp() {
 
     } catch (error) {
       console.error(error);
-      setDistillLogs(prev => [...prev, `[致命错误] API 请求失败，请检查 .env 中的密钥是否配置正确: ${error.message}`]);
+      setDistillLogs(prev => [...prev, `[致命错误] API 请求失败，请检查后端或网络状态: ${error.message}`]);
     }
   };
 
@@ -294,7 +280,7 @@ export default function DigitalPersonaApp() {
       console.error(error);
       setMessages((prev) => [
         ...prev,
-        { id: Date.now(), role: 'assistant', text: "[系统异常] 火山引擎连接遇到干扰，模型调用失败。", time: new Date().toLocaleTimeString() }
+        { id: Date.now(), role: 'assistant', text: "[系统异常] 后端服务连接遇到干扰，模型调用失败。", time: new Date().toLocaleTimeString() }
       ]);
     } finally {
       setIsTyping(false);
