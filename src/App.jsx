@@ -126,16 +126,24 @@ export default function DigitalPersonaApp() {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  const handleSendCode = () => {
-    if (!account) {
-      setAuthError(`请先在第二行填写您的${authMethod === 'email' ? '邮箱' : '手机号'}！`);
+  // 🌟 修复后的真实发送验证码逻辑
+  const handleSendCode = async () => {
+    if (!account || !account.includes('@')) {
+      setAuthError("请先在第二行填写正确的邮箱地址！");
       return;
     }
     setAuthError('');
-    // 触发倒计时
-    setCountdown(60);
-    // 这里未来可以接入腾讯云真实的发送验证码 API，目前模拟发送成功
-    alert(`✅ 验证码发送请求已提交！\n请注意查收您的 ${account}`);
+    try {
+      // 🚀 真正调用腾讯云发送验证码接口
+      // 注意：usage 可以是 'REGISTER' (注册) 或 'LOGIN' (登录)
+      await auth.sendEmailCode(account); 
+      
+      setCountdown(60); // 开启倒计时
+      alert(`✅ 验证码已发送至：${account}\n请检查收件箱（包括垃圾箱）。`);
+    } catch (err) {
+      console.error("发送失败:", err);
+      setAuthError("发送失败：" + (err.message || "请检查腾讯云后台邮箱配置"));
+    }
   };
 
   const generateUniqueId = () => {
