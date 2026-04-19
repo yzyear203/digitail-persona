@@ -1,37 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Fingerprint, Trash2, Clock, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, Cpu, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc } from 'firebase/firestore';
+// 🌟 仅替换了这部分的引入
+import tcb from '@cloudbase/js-sdk';
 
-// 🌟 生产级与预览环境双适配 Firebase 初始化
-let firebaseConfig = {};
-
-// 智能适配：如果是右侧预览面板，自动使用沙盒数据库配置
-if (typeof __firebase_config !== 'undefined') {
-  firebaseConfig = JSON.parse(__firebase_config);
-}
-
-
-if (Object.keys(firebaseConfig).length === 0) {
-    firebaseConfig = {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    };
-  }
-
-
+// 🌟 生产级腾讯云 TCB 初始化 (完全替换掉原有的 Firebase)
 let app, auth, db;
 try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
+  app = tcb.init({
+    env: import.meta.env.VITE_TCB_ENV_ID || "persona-app-d9gkoxk5rd2f70aff"
+  });
+  auth = app.auth();
+  db = app.database();
 } catch (error) {
-  console.error("Firebase 初始化失败，请检查 Vercel 环境变量配置:", error);
+  console.error("腾讯云 TCB 初始化失败，请检查环境变量配置:", error);
 }
 
-// 🌟 全新引擎：真实人类打字机模拟器
+// 🌟 全新引擎：真实人类打字机模拟器 (一字未改)
 const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
   const [displayText, setDisplayText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
@@ -149,27 +133,55 @@ export default function DigitalPersonaApp() {
   const terminalEndRef = useRef(null);
   const fileInputRef = useRef(null); 
 
+  // 🌟 修改点 1：替换为 TCB 的身份监听
   useEffect(() => {
     if (!auth) return;
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
+    const checkAuth = async () => {
+      const loginState = await auth.getLoginState();
+      if (loginState) {
+        setUser({
+          uid: loginState.user?.uid || 'anonymous_uid',
+          isAnonymous: loginState.loginType === 'ANONYMOUS',
+          email: loginState.user?.email
+        });
+      }
+    };
+    checkAuth();
+
+    const unsubscribe = auth.onLoginStateChanged((loginState) => {
+      if (loginState) {
+        setUser({
+          uid: loginState.user?.uid || 'anonymous_uid',
+          isAnonymous: loginState.loginType === 'ANONYMOUS',
+          email: loginState.user?.email
+        });
+      } else {
+        setUser(null);
+      }
+    });
+    return () => { if(typeof unsubscribe === 'function') unsubscribe(); };
   }, []);
 
+  // 🌟 修改点 2：替换为 TCB 的数据库实时监听
   useEffect(() => {
     if (!user || user.isAnonymous || !db) {
       setSavedPersonas([]);
       return;
     }
-    const personasRef = collection(db, 'users', user.uid, 'personas');
-    const unsubscribe = onSnapshot(personasRef, (snapshot) => {
-      const loaded = [];
-      snapshot.forEach(document => {
-        loaded.push({ id: document.id, ...document.data() });
+    const watcher = db.collection('personas')
+      .where({ owner: user.uid })
+      .watch({
+        onChange: (snapshot) => {
+          const loaded = [];
+          snapshot.docs.forEach(document => {
+            loaded.push({ id: document._id, ...document });
+          });
+          loaded.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          setSavedPersonas(loaded);
+        },
+        onError: (error) => console.error("数据加载失败:", error)
       });
-      loaded.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setSavedPersonas(loaded);
-    }, (error) => console.error(error));
-    return () => unsubscribe();
+    return () => watcher.close();
   }, [user]);
 
   useEffect(() => {
@@ -186,23 +198,32 @@ export default function DigitalPersonaApp() {
     else setAppPhase('auth');
   };
 
+  // 🌟 修改点 3：替换为 TCB 的邮箱注册/登录
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     if (!email || !password) return;
     setAuthError('');
     setIsAuthenticating(true);
     try {
-      if (isLoginMode) await signInWithEmailAndPassword(auth, email, password);
-      else await createUserWithEmailAndPassword(auth, email, password);
+      if (isLoginMode) {
+        await auth.signInWithEmailAndPassword(email, password);
+      } else {
+        await auth.signUpWithEmailAndPassword(email, password);
+      }
       setAppPhase('dashboard');
     } catch (err) {
       let errorMsg = "验证失败，请重试";
-      switch (err.code) {
-        case 'auth/user-not-found': case 'auth/invalid-credential': case 'auth/wrong-password':
-          errorMsg = '账号或密码错误，新用户请切换至注册模式！'; break;
-        case 'auth/email-already-in-use': errorMsg = '邮箱已被注册，请直接登录。'; break;
-        case 'auth/weak-password': errorMsg = '密码至少需要 6 个字符。'; break;
-        default: errorMsg = err.message;
+      const msg = err.message || "";
+      if (msg.includes('not exist') || msg.includes('找不到')) {
+        errorMsg = '账号不存在，新用户请切换至注册模式！';
+      } else if (msg.includes('wrong password') || msg.includes('密码')) {
+        errorMsg = '密码错误，请重新输入！';
+      } else if (msg.includes('already exists') || msg.includes('已被注册')) {
+        errorMsg = '邮箱已被注册，请直接登录。';
+      } else if (msg.includes('weak') || msg.includes('弱')) {
+        errorMsg = '密码至少需要 6 个字符。';
+      } else {
+        errorMsg = msg;
       }
       setAuthError(errorMsg);
     } finally {
@@ -210,11 +231,12 @@ export default function DigitalPersonaApp() {
     }
   };
 
+  // 🌟 修改点 4：替换为 TCB 的匿名登录
   const handleGuestAuth = async () => {
     setAuthError('');
     setIsAuthenticating(true);
     try {
-      await signInAnonymously(auth);
+      await auth.anonymousAuthProvider().signIn();
       setAppPhase('dashboard');
     } catch (err) {
       setAuthError("游客登录失败: " + err.message);
@@ -223,8 +245,9 @@ export default function DigitalPersonaApp() {
     }
   };
 
+  // 🌟 修改点 5：替换为 TCB 的退出登录
   const handleLogout = async () => {
-    if (auth) await signOut(auth);
+    if (auth) await auth.signOut();
     setAppPhase('home');
     setMessages([]);
     setSavedPersonas([]);
@@ -293,13 +316,10 @@ export default function DigitalPersonaApp() {
     }
   };
 
-  // 🌟 双环境智能调用大模型接口
   const callDoubaoAPI = async (promptText, systemInstructionText = null, imageParts = []) => {
-    // 自动判定：当前是否在预览沙盒环境中
     const isSandboxEnv = typeof __firebase_config !== 'undefined';
 
     if (isSandboxEnv) {
-      // === 沙盒预览专用通道 ===
       const apiKey = "";
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
       
@@ -330,7 +350,6 @@ export default function DigitalPersonaApp() {
       return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       
     } else {
-      // === Vercel 生产环境专用通道 (调用 /api/generate) ===
       let messages = [];
       if (systemInstructionText) messages.push({ role: "system", content: systemInstructionText });
 
@@ -406,10 +425,12 @@ export default function DigitalPersonaApp() {
 
       if (user && !user.isAnonymous && db) {
         try {
-          await addDoc(collection(db, 'users', user.uid, 'personas'), {
+          // 🌟 修改点 6：替换为 TCB 的添加数据方法
+          await db.collection('personas').add({
             name: uploadedFiles[0]?.name ? uploadedFiles[0].name.split('.')[0] : '未命名数字人',
             personaPrompt: generatedPersona,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            owner: user.uid
           });
           setDistillLogs(prev => [...prev, "[云端同步] 档案已永久刻录至数据库。"]);
         } catch (err) { console.error(err); }
@@ -557,10 +578,15 @@ export default function DigitalPersonaApp() {
     setAppPhase('chat');
   };
 
+  // 🌟 修改点 7：替换为 TCB 的删除数据方法
   const handleDeleteSavedPersona = async (e, personaId) => {
     e.stopPropagation(); 
     if (!user || !db) return;
-    try { await deleteDoc(doc(db, 'users', user.uid, 'personas', personaId)); } catch (err) {}
+    try { 
+      await db.collection('personas').doc(personaId).remove(); 
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   if (appPhase === 'home') {
