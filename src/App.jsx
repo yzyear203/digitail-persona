@@ -14,12 +14,12 @@ if (typeof __firebase_config !== 'undefined') {
 
 
 if (Object.keys(firebaseConfig).length === 0) {
-  firebaseConfig = {
-    apiKey: import.meta.env.FIREBASE_API_KEY,
-    authDomain: import.meta.env.FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.FIREBASE_PROJECT_ID,
-  };
-}
+    firebaseConfig = {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    };
+  }
 
 
 let app, auth, db;
