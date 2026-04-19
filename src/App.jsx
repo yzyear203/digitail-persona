@@ -224,7 +224,7 @@ export default function DigitalPersonaApp() {
       else if (msg.includes('起一个昵称') || msg.includes('6 位')) errorMsg = msg;
       else if (msg.includes('already exists') || msg.includes('已注册')) errorMsg = '该邮箱已被注册！若未激活请去邮箱点击激活链接。';
       else if (msg.includes('Email verify')) errorMsg = '邮箱尚未激活，请前往您的邮箱点击腾讯云发送的确认链接！';
-      setAuthError(errorMsg);
+      setAuthError("底层真实报错: " + (err.message || JSON.stringify(err)));
     } finally {
       setIsAuthenticating(false);
     }
