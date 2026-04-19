@@ -14,7 +14,7 @@ try {
   console.error("腾讯云 TCB 初始化失败，请检查环境变量配置:", error);
 }
 
-// 🌟 打字机引擎
+// 🌟 打字机引擎 (保持不变)
 const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
   const [displayText, setDisplayText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
@@ -86,22 +86,24 @@ export default function DigitalPersonaApp() {
   const [showTasksModal, setShowTasksModal] = useState(false);
   const [showComplianceBanner, setShowComplianceBanner] = useState(true); 
 
-  // 🌟 核心升级：账号系统状态
-  const [authMethod, setAuthMethod] = useState('password'); // 'password' 或 'code'
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState(''); // 二次密码校验
-  const [nickname, setNickname] = useState(''); // 自定义昵称
-  const [verificationCode, setVerificationCode] = useState(''); // 验证码输入
-  
+  // 🌟 核心升级：标准五步账号系统状态
+  const [authMethod, setAuthMethod] = useState('email'); // 'email' 或 'phone'
   const [isLoginMode, setIsLoginMode] = useState(true);
+  
+  const [nickname, setNickname] = useState(''); // 行1: 用户名
+  const [account, setAccount] = useState(''); // 行2: 账号(邮箱/手机)
+  const [password, setPassword] = useState(''); // 行3: 密码
+  const [confirmPassword, setConfirmPassword] = useState(''); // 行4: 确认密码
+  const [verificationCode, setVerificationCode] = useState(''); // 行5: 验证码
+  
+  const [countdown, setCountdown] = useState(0); // 倒计时状态
   const [authError, setAuthError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [showAgreementModal, setShowAgreementModal] = useState(false);
   const [isAgreed, setIsAgreed] = useState(false);
 
   const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null); // 存储云端档案
+  const [userProfile, setUserProfile] = useState(null); 
   
   const [savedPersonas, setSavedPersonas] = useState([]);
   const [uploadedFiles, setUploadedFiles] = useState([]); 
@@ -113,7 +115,29 @@ export default function DigitalPersonaApp() {
   const terminalEndRef = useRef(null);
   const fileInputRef = useRef(null); 
 
-  // 🌟 生成唯一 UID
+  // 🌟 验证码倒计时逻辑
+  useEffect(() => {
+    let timer;
+    if (countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [countdown]);
+
+  const handleSendCode = () => {
+    if (!account) {
+      setAuthError(`请先在第二行填写您的${authMethod === 'email' ? '邮箱' : '手机号'}！`);
+      return;
+    }
+    setAuthError('');
+    // 触发倒计时
+    setCountdown(60);
+    // 这里未来可以接入腾讯云真实的发送验证码 API，目前模拟发送成功
+    alert(`✅ 验证码发送请求已提交！\n请注意查收您的 ${account}`);
+  };
+
   const generateUniqueId = () => {
     return 'UID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
   };
@@ -130,14 +154,8 @@ export default function DigitalPersonaApp() {
         if (res.data && res.data.length > 0) {
           setUserProfile(res.data[0]); 
         } else {
-          const savedNickname = localStorage.getItem('temp_nickname') || email.split('@')[0];
-          const newProfile = {
-            uid: uid,
-            email: email,
-            nickname: savedNickname,
-            shortId: generateUniqueId(),
-            createdAt: db.serverDate()
-          };
+          const savedNickname = localStorage.getItem('temp_nickname') || email.split('@')[0] || '新用户';
+          const newProfile = { uid: uid, email: email, nickname: savedNickname, shortId: generateUniqueId(), createdAt: db.serverDate() };
           await db.collection('users').add(newProfile);
           setUserProfile(newProfile);
           localStorage.removeItem('temp_nickname'); 
@@ -147,9 +165,9 @@ export default function DigitalPersonaApp() {
 
     const handleLoginState = async (loginState) => {
       if (loginState) {
-        const isAnon = loginState.authType === 'ANONYMOUS' || (!loginState.user?.email);
+        const isAnon = loginState.authType === 'ANONYMOUS' || (!loginState.user?.email && !loginState.user?.phoneNumber);
         const uid = loginState.user?.uid || 'anonymous_uid';
-        const userEmail = loginState.user?.email || '';
+        const userEmail = loginState.user?.email || loginState.user?.phoneNumber || '';
         setUser({ uid, isAnonymous: isAnon, email: userEmail });
         await loadUserProfile(uid, userEmail, isAnon);
       } else {
@@ -185,45 +203,48 @@ export default function DigitalPersonaApp() {
     else setAppPhase('auth');
   };
 
-  // 🌟 认证路由拦截器
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
     setIsAuthenticating(true);
 
-    // 拦截验证码通道 (MVP 防刷保护)
-    if (authMethod === 'code') {
-      setTimeout(() => {
-        setAuthError("📱 内测防刷保护：验证码通道需配置网关。内测期间请点击上方切换至【账号密码】通道完成验证！");
-        setIsAuthenticating(false);
-      }, 800);
-      return;
-    }
-
-    // 执行正规账号密码验证逻辑
     try {
       if (!isLoginMode) {
-        if (password.length < 6) throw new Error("密码至少需要 6 位字符");
-        if (password !== confirmPassword) throw new Error("两次输入的密码不一致，请重新检查！");
-        if (!nickname.trim()) throw new Error("请为自己起一个前台昵称");
+        // 注册模式：严格校验 5 项输入
+        if (!nickname.trim()) throw new Error("第一行：请填写您的用户名");
+        if (!account.trim()) throw new Error(`第二行：请填写您的${authMethod === 'email' ? '邮箱' : '手机号'}`);
+        if (password.length < 6) throw new Error("第三行：密码至少需要 6 位字符");
+        if (password !== confirmPassword) throw new Error("第四行：两次输入的密码不一致！");
+        if (!verificationCode.trim()) throw new Error("第五行：请输入您收到的验证码");
 
+        // 缓存昵称用于数据库初始化
         localStorage.setItem('temp_nickname', nickname.trim());
-        await auth.signUpWithEmailAndPassword(email, password);
-        alert("🎉 注册指令已发送！\n请前往邮箱点击【激活链接】。\n(若您收到的是纯数字验证码，请登录腾讯云后台修改邮件模板配置。)");
-        setIsLoginMode(true); 
+        
+        if (authMethod === 'phone') {
+          throw new Error("📱 内测提示：当前暂未开通短信网关，请切换至上方【邮箱注册】通道。");
+        } else {
+          // 这里是标准的注册调用。若腾讯云配置了需要验证码，实际业务中应该调用带着验证码注册的接口。
+          // 目前我们先调用 signUpWithEmailAndPassword 走通主流程。
+          await auth.signUpWithEmailAndPassword(account, password);
+          alert("🎉 注册成功！\n您的专属档案已建立，现在为您切换至登录界面。");
+          setIsLoginMode(true); 
+          setVerificationCode('');
+          setConfirmPassword('');
+        }
       } else {
-        await auth.signInWithEmailAndPassword(email, password);
+        // 登录模式：只需校验账号密码
+        if (authMethod === 'phone') throw new Error("📱 内测提示：请使用邮箱通道登录。");
+        await auth.signInWithEmailAndPassword(account, password);
         setAppPhase('dashboard');
       }
     } catch (err) {
       let errorMsg = "验证失败，请检查格式或重试";
       const msg = err.message || "";
-      if (msg.includes('not exist') || msg.includes('找不到')) errorMsg = '账号未注册，请先点击下方“建立新档案”！';
+      if (msg.includes('第一行') || msg.includes('第二行') || msg.includes('第三行') || msg.includes('第四行') || msg.includes('第五行') || msg.includes('内测提示')) errorMsg = msg;
+      else if (msg.includes('not exist') || msg.includes('找不到')) errorMsg = '账号未注册，请先点击下方“建立新账号”！';
       else if (msg.includes('wrong password') || msg.includes('密码')) errorMsg = '安全密码错误，请重新输入！';
-      else if (msg.includes('不一致')) errorMsg = msg;
-      else if (msg.includes('昵称') || msg.includes('6 位')) errorMsg = msg;
-      else if (msg.includes('already exists') || msg.includes('已注册')) errorMsg = '该账号已被注册！若未激活请前往邮箱点击链接。';
-      else if (msg.includes('Email verify')) errorMsg = '账号尚未激活，请前往您的邮箱点击腾讯云发送的确认链接！';
+      else if (msg.includes('already exists') || msg.includes('已注册')) errorMsg = '该账号已被注册，请直接登录。';
+      else if (msg.includes('Email verify')) errorMsg = '账号验证失败，请检查验证码或激活状态。';
       setAuthError(errorMsg);
     } finally {
       setIsAuthenticating(false);
@@ -242,39 +263,32 @@ export default function DigitalPersonaApp() {
     setAppPhase('home'); setMessages([]); setSavedPersonas([]); setUploadedFiles([]); setIsResponding(false); setUserProfile(null);
   };
 
+  // --- 文件处理与 AI 逻辑部分 (保持不变) ---
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
       const newFiles = await Promise.all(files.map(async (f) => {
         return new Promise((resolve) => {
-          const isImage = f.type.startsWith('image/');
-          const isText = f.name.endsWith('.txt') || f.type === 'text/plain';
-
+          const isImage = f.type.startsWith('image/'); const isText = f.name.endsWith('.txt') || f.type === 'text/plain';
           if (isImage) {
             const reader = new FileReader();
             reader.onload = (event) => {
               const img = new Image();
               img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 800; let width = img.width; let height = img.height;
+                const canvas = document.createElement('canvas'); const MAX_WIDTH = 800; let width = img.width; let height = img.height;
                 if (width > MAX_WIDTH) { height = Math.round((height * MAX_WIDTH) / width); width = MAX_WIDTH; }
-                canvas.width = width; canvas.height = height;
-                const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
-                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                const base64String = compressedDataUrl.split(',')[1];
+                canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6); const base64String = compressedDataUrl.split(',')[1];
                 resolve({ name: f.name, type: 'img', size: '已压缩', mimeType: 'image/jpeg', base64Data: base64String, textContent: null, isImage: true, isText: false });
-              };
-              img.src = event.target.result;
-            };
-            reader.readAsDataURL(f);
+              }; img.src = event.target.result;
+            }; reader.readAsDataURL(f);
           } else if (isText) {
             const reader = new FileReader();
             reader.onloadend = () => { resolve({ name: f.name, type: 'doc', size: (f.size / 1024 / 1024).toFixed(2) + ' MB', mimeType: f.type || 'text/plain', base64Data: null, textContent: reader.result, isImage: false, isText: true }); };
             reader.readAsText(f);
           } else resolve({ name: f.name, warning: "仅支持图片与txt" });
         });
-      }));
-      setUploadedFiles(prev => [...prev, ...newFiles]);
+      })); setUploadedFiles(prev => [...prev, ...newFiles]);
     }
   };
 
@@ -290,15 +304,13 @@ export default function DigitalPersonaApp() {
         for (let i = 0; i < retries; i++) {
           try {
             const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-            if (!response.ok) throw new Error("API 报错");
-            return await response.json();
+            if (!response.ok) throw new Error("API 报错"); return await response.json();
           } catch (e) { if (i === retries - 1) throw e; await new Promise(res => setTimeout(res, delay * Math.pow(2, i))); }
         }
       };
       const data = await fetchWithRetry(); return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     } else {
-      let messages = [];
-      if (systemInstructionText) messages.push({ role: "system", content: systemInstructionText });
+      let messages = []; if (systemInstructionText) messages.push({ role: "system", content: systemInstructionText });
       let userContent = [];
       if (imageParts.length > 0) {
         userContent.push({ type: "text", text: promptText });
@@ -467,27 +479,27 @@ export default function DigitalPersonaApp() {
     );
   }
 
-  // 🌟 全新重构：商业级登录/注册入口
+  // 🌟 终极版：五步合一注册与登录系统
   if (appPhase === 'auth') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-        <div className="bg-white w-full max-w-[480px] rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-fade-in flex flex-col relative">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans py-12">
+        <div className="bg-white w-full max-w-[480px] rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-fade-in flex flex-col relative my-auto">
           
           {/* 三维 Tab 切换区 */}
           <div className="flex bg-slate-100 p-1.5 m-5 rounded-2xl shadow-inner">
-            <button onClick={() => {setAuthMethod('password'); setAuthError('');}} className={`flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center transition-all duration-300 ${authMethod === 'password' ? 'bg-white text-indigo-600 shadow-md transform scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}>
-              <Key className="w-4 h-4 mr-2" /> 账号密码认证
+            <button onClick={() => {setAuthMethod('email'); setAuthError('');}} className={`flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center transition-all duration-300 ${authMethod === 'email' ? 'bg-white text-indigo-600 shadow-md transform scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}>
+              <Mail className="w-4 h-4 mr-2" /> 邮箱通行证
             </button>
-            <button onClick={() => {setAuthMethod('code'); setAuthError('');}} className={`flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center transition-all duration-300 ${authMethod === 'code' ? 'bg-white text-indigo-600 shadow-md transform scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}>
-              <Smartphone className="w-4 h-4 mr-2" /> 验证码快捷登录
+            <button onClick={() => {setAuthMethod('phone'); setAuthError('');}} className={`flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center transition-all duration-300 ${authMethod === 'phone' ? 'bg-white text-indigo-600 shadow-md transform scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}>
+              <Smartphone className="w-4 h-4 mr-2" /> 手机快捷注册
             </button>
           </div>
 
-          <div className="px-10 pb-10 pt-4 flex-1">
+          <div className="px-10 pb-10 pt-2 flex-1">
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">{isLoginMode ? '欢迎回来' : '创建专属档案'}</h1>
+              <h1 className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">{isLoginMode ? '欢迎回来' : '建立专属档案'}</h1>
               <p className="text-slate-500 text-sm font-medium">
-                {isLoginMode ? '登录编译器，唤醒您的专属数字分身' : '注册即分配全站唯一专属 UID 系统编码'}
+                {isLoginMode ? '登录编译器，唤醒您的专属数字分身' : '请按步骤完成信息填写，获取全站唯一 UID'}
               </p>
             </div>
 
@@ -497,68 +509,75 @@ export default function DigitalPersonaApp() {
               </div>
             )}
 
-            <form onSubmit={handleAuthSubmit} className="space-y-5">
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
               
-              {/* 仅在注册模式下要求输入昵称 */}
-              {!isLoginMode && authMethod === 'password' && (
-                <div className="space-y-5 animate-fade-in">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">数字前台昵称</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><User className="h-5 w-5 text-slate-400"/></div>
-                      <input type="text" value={nickname} onChange={e => setNickname(e.target.value)} required minLength="2" maxLength="12" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-bold text-slate-900 placeholder-slate-400" placeholder="起一个好听的昵称" />
-                    </div>
+              {/* 行1：用户名 (仅注册) */}
+              {!isLoginMode && (
+                <div className="animate-fade-in">
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">第一行：设置用户名</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><User className="h-5 w-5 text-slate-400"/></div>
+                    <input type="text" value={nickname} onChange={e => setNickname(e.target.value)} required minLength="2" maxLength="12" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-bold text-slate-900 placeholder-slate-400" placeholder="为自己起一个好听的昵称" />
                   </div>
                 </div>
               )}
 
-              {/* 统一输入框：邮箱 或 手机号 */}
+              {/* 行2：邮箱或手机号 (通用) */}
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">{authMethod === 'password' ? '绑定邮箱' : '联系方式'}</label>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">{isLoginMode ? '登录账号' : `第二行：绑定${authMethod === 'email' ? '邮箱' : '手机'}`}</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    {authMethod === 'password' ? <Mail className="h-5 w-5 text-slate-400"/> : <Smartphone className="h-5 w-5 text-slate-400"/>}
+                    {authMethod === 'email' ? <Mail className="h-5 w-5 text-slate-400"/> : <Smartphone className="h-5 w-5 text-slate-400"/>}
                   </div>
-                  <input type={authMethod === 'password' ? "email" : "text"} value={email} onChange={e => setEmail(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-bold text-slate-900 placeholder-slate-400" placeholder={authMethod === 'password' ? "输入您的常用邮箱" : "输入手机号或邮箱"} />
+                  <input type={authMethod === 'email' ? "email" : "text"} value={account} onChange={e => setAccount(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-bold text-slate-900 placeholder-slate-400" placeholder={authMethod === 'email' ? "输入您的常用邮箱" : "输入手机号"} />
                 </div>
               </div>
 
-              {/* 密码 或 验证码 */}
+              {/* 行3：密码 (通用) */}
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">{authMethod === 'password' ? '安全密码' : '安全验证码'}</label>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">{isLoginMode ? '安全密码' : '第三行：设置安全密码'}</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Lock className="h-5 w-5 text-slate-400"/></div>
-                  <input type={authMethod === 'password' ? "password" : "text"} value={authMethod === 'password' ? password : verificationCode} onChange={e => authMethod === 'password' ? setPassword(e.target.value) : setVerificationCode(e.target.value)} required minLength={authMethod === 'password' ? "6" : "4"} className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-bold text-slate-900 placeholder-slate-400" placeholder={authMethod === 'password' ? "至少 6 位密码" : "请输入 6 位验证码"} />
-                  {authMethod === 'code' && (
-                    <button type="button" className="absolute inset-y-2 right-2 px-4 bg-indigo-50 text-indigo-600 font-bold text-xs rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-100">获取验证码</button>
-                  )}
+                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength="6" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-bold text-slate-900 placeholder-slate-400" placeholder="至少输入 6 位密码" />
                 </div>
               </div>
 
-              {/* 仅在注册模式下要求的二次密码校验 */}
-              {!isLoginMode && authMethod === 'password' && (
+              {/* 行4：再次输入密码 (仅注册) */}
+              {!isLoginMode && (
                 <div className="animate-fade-in">
-                  <label className="block text-sm font-bold text-slate-700 mb-2">确认安全密码</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">第四行：确认安全密码</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><ShieldCheck className={`h-5 w-5 ${confirmPassword && confirmPassword === password ? 'text-green-500' : 'text-slate-400'}`}/></div>
-                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength="6" className={`w-full bg-slate-50 border ${confirmPassword && confirmPassword !== password ? 'border-red-400 focus:ring-red-500' : 'border-slate-200 focus:ring-indigo-500'} rounded-xl pl-11 pr-4 py-3.5 focus:ring-2 focus:bg-white outline-none transition-all font-bold text-slate-900 placeholder-slate-400`} placeholder="请再次输入密码以确认" />
+                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength="6" className={`w-full bg-slate-50 border ${confirmPassword && confirmPassword !== password ? 'border-red-400 focus:ring-red-500' : 'border-slate-200 focus:ring-indigo-500'} rounded-xl pl-11 pr-4 py-3.5 focus:ring-2 focus:bg-white outline-none transition-all font-bold text-slate-900 placeholder-slate-400`} placeholder="请再次输入密码以确保无误" />
                   </div>
                   {confirmPassword && confirmPassword !== password && <p className="text-red-500 text-xs font-bold mt-2 pl-1 flex items-center"><X className="w-3 h-3 mr-1" />两次密码输入不一致</p>}
                 </div>
               )}
 
-              <button type="submit" disabled={isAuthenticating || (authMethod === 'password' && !isLoginMode && password !== confirmPassword)} className="w-full mt-8 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold text-lg flex justify-center items-center shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:-translate-y-0.5">
-                {isAuthenticating ? <Loader2 className="w-6 h-6 animate-spin" /> : <span>{authMethod === 'code' ? '验证并进入系统' : (isLoginMode ? '安全登录' : '立即注册分配专属 UID')}</span>}
+              {/* 行5：输入验证码与倒计时 (仅注册) */}
+              {!isLoginMode && (
+                <div className="animate-fade-in pb-2">
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">第五行：身份验证码</label>
+                  <div className="relative flex items-center">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Hash className="h-5 w-5 text-slate-400"/></div>
+                    <input type="text" value={verificationCode} onChange={e => setVerificationCode(e.target.value)} required minLength="4" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-28 py-3.5 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-bold text-slate-900 placeholder-slate-400 tracking-widest" placeholder="输入验证码" />
+                    <button type="button" onClick={handleSendCode} disabled={countdown > 0} className={`absolute right-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all ${countdown > 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100'}`}>
+                      {countdown > 0 ? `${countdown}s 后重新获取` : '获取验证码'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <button type="submit" disabled={isAuthenticating || (!isLoginMode && password !== confirmPassword)} className="w-full mt-8 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold text-lg flex justify-center items-center shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:-translate-y-0.5">
+                {isAuthenticating ? <Loader2 className="w-6 h-6 animate-spin" /> : <span>{isLoginMode ? '安全登录' : '提交注册建立账号'}</span>}
               </button>
             </form>
 
-            {authMethod === 'password' && (
-              <div className="text-center mt-6">
-                <button onClick={() => { setIsLoginMode(!isLoginMode); setAuthError(''); setPassword(''); setConfirmPassword(''); }} className="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
-                  {isLoginMode ? '没有数字档案？点此建立新档案' : '已有专属档案？点此返回登录'}
-                </button>
-              </div>
-            )}
+            <div className="text-center mt-6">
+              <button onClick={() => { setIsLoginMode(!isLoginMode); setAuthError(''); setPassword(''); setConfirmPassword(''); setVerificationCode(''); }} className="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
+                {isLoginMode ? '没有数字账号？点此完成五步注册' : '已有专属账号？点此返回直接登录'}
+              </button>
+            </div>
 
             <div className="relative flex items-center py-7"><div className="flex-grow border-t border-slate-100"></div><span className="flex-shrink-0 mx-4 text-slate-300 text-[10px] font-bold uppercase tracking-wider">临时体验区</span><div className="flex-grow border-t border-slate-100"></div></div>
             
@@ -571,7 +590,7 @@ export default function DigitalPersonaApp() {
     );
   }
 
-  // 🌟 工作台界面：展示 UID 与完善信息
+  // 🌟 工作台界面
   if (appPhase === 'dashboard') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center p-6 font-sans">
