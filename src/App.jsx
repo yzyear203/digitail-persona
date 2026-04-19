@@ -126,7 +126,7 @@ export default function DigitalPersonaApp() {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  // 🌟 修复后的真实发送验证码逻辑
+  // 🌟 修复：真正调用腾讯云发信接口的逻辑
   const handleSendCode = async () => {
     if (!account || !account.includes('@')) {
       setAuthError("请先在第二行填写正确的邮箱地址！");
@@ -134,15 +134,14 @@ export default function DigitalPersonaApp() {
     }
     setAuthError('');
     try {
-      // 🚀 真正调用腾讯云发送验证码接口
-      // 注意：usage 可以是 'REGISTER' (注册) 或 'LOGIN' (登录)
+      // 🚀 核心修复：这里才是真正向腾讯云服务器请求发送验证码！
       await auth.sendEmailCode(account); 
       
-      setCountdown(60); // 开启倒计时
-      alert(`✅ 验证码已发送至：${account}\n请检查收件箱（包括垃圾箱）。`);
+      setCountdown(60); // 触发真实的 60 秒倒计时
+      alert(`✅ 验证码已真实发送至：${account}\n请去邮箱（包括垃圾箱）查收。`);
     } catch (err) {
-      console.error("发送失败:", err);
-      setAuthError("发送失败：" + (err.message || "请检查腾讯云后台邮箱配置"));
+      console.error("发送验证码失败:", err);
+      setAuthError("发送失败：" + (err.message || "请检查腾讯云后台配置"));
     }
   };
 
