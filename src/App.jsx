@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Fingerprint, Trash2, Clock, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, Cpu, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X } from 'lucide-react';
-// 🌟 仅替换了这部分的引入
 import tcb from '@cloudbase/js-sdk';
 
-// 🌟 生产级腾讯云 TCB 初始化 (完全替换掉原有的 Firebase)
+
 let app, auth, db;
 try {
   app = tcb.init({
@@ -15,7 +14,7 @@ try {
   console.error("腾讯云 TCB 初始化失败，请检查环境变量配置:", error);
 }
 
-// 🌟 全新引擎：真实人类打字机模拟器 (一字未改)
+
 const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
   const [displayText, setDisplayText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
@@ -133,7 +132,7 @@ export default function DigitalPersonaApp() {
   const terminalEndRef = useRef(null);
   const fileInputRef = useRef(null); 
 
-  // 🌟 修改点 1：替换为 TCB 的身份监听
+ 
   useEffect(() => {
     if (!auth) return;
     const checkAuth = async () => {
@@ -162,7 +161,7 @@ export default function DigitalPersonaApp() {
     return () => { if(typeof unsubscribe === 'function') unsubscribe(); };
   }, []);
 
-  // 🌟 修改点 2：替换为 TCB 的数据库实时监听
+
   useEffect(() => {
     if (!user || user.isAnonymous || !db) {
       setSavedPersonas([]);
@@ -198,7 +197,7 @@ export default function DigitalPersonaApp() {
     else setAppPhase('auth');
   };
 
-  // 🌟 修改点 3：替换为 TCB 的邮箱注册/登录
+
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     if (!email || !password) return;
@@ -231,7 +230,7 @@ export default function DigitalPersonaApp() {
     }
   };
 
-  // 🌟 修改点 4：替换为 TCB 的匿名登录
+ 
   const handleGuestAuth = async () => {
     setAuthError('');
     setIsAuthenticating(true);
@@ -245,7 +244,7 @@ export default function DigitalPersonaApp() {
     }
   };
 
-  // 🌟 修改点 5：替换为 TCB 的退出登录
+
   const handleLogout = async () => {
     if (auth) await auth.signOut();
     setAppPhase('home');
@@ -425,7 +424,7 @@ export default function DigitalPersonaApp() {
 
       if (user && !user.isAnonymous && db) {
         try {
-          // 🌟 修改点 6：替换为 TCB 的添加数据方法
+  
           await db.collection('personas').add({
             name: uploadedFiles[0]?.name ? uploadedFiles[0].name.split('.')[0] : '未命名数字人',
             personaPrompt: generatedPersona,
@@ -578,7 +577,7 @@ export default function DigitalPersonaApp() {
     setAppPhase('chat');
   };
 
-  // 🌟 修改点 7：替换为 TCB 的删除数据方法
+
   const handleDeleteSavedPersona = async (e, personaId) => {
     e.stopPropagation(); 
     if (!user || !db) return;
