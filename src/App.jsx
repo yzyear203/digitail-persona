@@ -132,7 +132,7 @@ export default function DigitalPersonaApp() {
   const terminalEndRef = useRef(null);
   const fileInputRef = useRef(null); 
 
- 
+
   useEffect(() => {
     if (!auth) return;
     const checkAuth = async () => {
@@ -140,7 +140,8 @@ export default function DigitalPersonaApp() {
       if (loginState) {
         setUser({
           uid: loginState.user?.uid || 'anonymous_uid',
-          isAnonymous: loginState.loginType === 'ANONYMOUS',
+          // 修复：同时检查 authType 或者是否没有邮箱，双重保险判定游客
+          isAnonymous: loginState.authType === 'ANONYMOUS' || !loginState.user?.email,
           email: loginState.user?.email
         });
       }
@@ -151,7 +152,7 @@ export default function DigitalPersonaApp() {
       if (loginState) {
         setUser({
           uid: loginState.user?.uid || 'anonymous_uid',
-          isAnonymous: loginState.loginType === 'ANONYMOUS',
+          isAnonymous: loginState.authType === 'ANONYMOUS' || !loginState.user?.email,
           email: loginState.user?.email
         });
       } else {
