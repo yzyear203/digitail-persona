@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Fingerprint, Trash2, Clock, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, Cpu, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X } from 'lucide-react';
+import { ShieldCheck, Fingerprint, Trash2, Clock, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, Cpu, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X, MessageCircle } from 'lucide-react';
 import tcb from '@cloudbase/js-sdk';
 
-
+// 🌟 生产级腾讯云 TCB 初始化
 let app, auth, db;
 try {
   app = tcb.init({
@@ -14,7 +14,7 @@ try {
   console.error("腾讯云 TCB 初始化失败，请检查环境变量配置:", error);
 }
 
-
+// 🌟 全新引擎：真实人类打字机模拟器
 const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
   const [displayText, setDisplayText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
@@ -132,7 +132,6 @@ export default function DigitalPersonaApp() {
   const terminalEndRef = useRef(null);
   const fileInputRef = useRef(null); 
 
-
   useEffect(() => {
     if (!auth) return;
     const checkAuth = async () => {
@@ -140,9 +139,8 @@ export default function DigitalPersonaApp() {
       if (loginState) {
         setUser({
           uid: loginState.user?.uid || 'anonymous_uid',
-          // 修复：同时检查 authType 或者是否没有邮箱，双重保险判定游客
-          isAnonymous: loginState.authType === 'ANONYMOUS' || !loginState.user?.email,
-          email: loginState.user?.email
+          isAnonymous: loginState.authType === 'ANONYMOUS' || (!loginState.user?.email && !loginState.user?.username && !loginState.user?.wxOpenId),
+          email: loginState.user?.email || loginState.user?.username || '微信用户'
         });
       }
     };
@@ -152,8 +150,8 @@ export default function DigitalPersonaApp() {
       if (loginState) {
         setUser({
           uid: loginState.user?.uid || 'anonymous_uid',
-          isAnonymous: loginState.authType === 'ANONYMOUS' || !loginState.user?.email,
-          email: loginState.user?.email
+          isAnonymous: loginState.authType === 'ANONYMOUS' || (!loginState.user?.email && !loginState.user?.username && !loginState.user?.wxOpenId),
+          email: loginState.user?.email || loginState.user?.username || '微信用户'
         });
       } else {
         setUser(null);
@@ -161,7 +159,6 @@ export default function DigitalPersonaApp() {
     });
     return () => { if(typeof unsubscribe === 'function') unsubscribe(); };
   }, []);
-
 
   useEffect(() => {
     if (!user || user.isAnonymous || !db) {
@@ -198,7 +195,7 @@ export default function DigitalPersonaApp() {
     else setAppPhase('auth');
   };
 
-
+  // 🌟 适配腾讯云【用户名密码】体系，将邮箱作为用户名传入
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     if (!email || !password) return;
@@ -206,9 +203,9 @@ export default function DigitalPersonaApp() {
     setIsAuthenticating(true);
     try {
       if (isLoginMode) {
-        await auth.signInWithEmailAndPassword(email, password);
+        await auth.signInWithUsernameAndPassword(email, password);
       } else {
-        await auth.signUpWithEmailAndPassword(email, password);
+        await auth.signUpWithUsernameAndPassword(email, password);
       }
       setAppPhase('dashboard');
     } catch (err) {
@@ -218,8 +215,8 @@ export default function DigitalPersonaApp() {
         errorMsg = '账号不存在，新用户请切换至注册模式！';
       } else if (msg.includes('wrong password') || msg.includes('密码')) {
         errorMsg = '密码错误，请重新输入！';
-      } else if (msg.includes('already exists') || msg.includes('已被注册')) {
-        errorMsg = '邮箱已被注册，请直接登录。';
+      } else if (msg.includes('already exists') || msg.includes('存在')) {
+        errorMsg = '该账号已被注册，请直接登录。';
       } else if (msg.includes('weak') || msg.includes('弱')) {
         errorMsg = '密码至少需要 6 个字符。';
       } else {
@@ -231,7 +228,22 @@ export default function DigitalPersonaApp() {
     }
   };
 
- 
+  // 🌟 新增：微信开放平台登录逻辑
+  const handleWechatAuth = async () => {
+    setAuthError('');
+    setIsAuthenticating(true);
+    try {
+      const provider = auth.weixinAuthProvider();
+      await provider.signIn();
+      // 成功后 SDK 会自动触发 onLoginStateChanged 并进入 dashboard
+      setAppPhase('dashboard');
+    } catch (err) {
+      setAuthError("微信登录环境未配置完毕，请在腾讯云后台检查AppID配置: " + err.message);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
   const handleGuestAuth = async () => {
     setAuthError('');
     setIsAuthenticating(true);
@@ -244,7 +256,6 @@ export default function DigitalPersonaApp() {
       setIsAuthenticating(false);
     }
   };
-
 
   const handleLogout = async () => {
     if (auth) await auth.signOut();
@@ -425,7 +436,6 @@ export default function DigitalPersonaApp() {
 
       if (user && !user.isAnonymous && db) {
         try {
-  
           await db.collection('personas').add({
             name: uploadedFiles[0]?.name ? uploadedFiles[0].name.split('.')[0] : '未命名数字人',
             personaPrompt: generatedPersona,
@@ -578,7 +588,6 @@ export default function DigitalPersonaApp() {
     setAppPhase('chat');
   };
 
-
   const handleDeleteSavedPersona = async (e, personaId) => {
     e.stopPropagation(); 
     if (!user || !db) return;
@@ -692,7 +701,15 @@ export default function DigitalPersonaApp() {
               <button onClick={() => { setIsLoginMode(!isLoginMode); setAuthError(''); }} className="text-sm text-indigo-600 hover:underline">{isLoginMode ? '没有账号？点击注册' : '已有账号？返回登录'}</button>
             </div>
             <div className="relative flex items-center py-2 mb-4"><div className="flex-grow border-t border-slate-200"></div><span className="flex-shrink-0 mx-4 text-slate-400 text-sm">或者</span><div className="flex-grow border-t border-slate-200"></div></div>
-            <button onClick={handleGuestAuth} disabled={isAuthenticating} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-medium flex justify-center items-center space-x-2"><UserCircle className="w-5 h-5" /><span>直接匿名体验 (不保存数据)</span></button>
+            
+            {/* 🌟 微信一键登录按钮 */}
+            <button onClick={handleWechatAuth} disabled={isAuthenticating} className="w-full bg-[#07C160] hover:bg-[#06ad56] text-white py-3 rounded-xl font-medium flex justify-center items-center space-x-2 mb-3 transition-colors shadow-sm">
+              <MessageCircle className="w-5 h-5" /><span>微信一键安全登录</span>
+            </button>
+
+            <button onClick={handleGuestAuth} disabled={isAuthenticating} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-medium flex justify-center items-center space-x-2 transition-colors">
+              <UserCircle className="w-5 h-5" /><span>直接匿名体验 (不保存数据)</span>
+            </button>
           </div>
         </div>
       </div>
