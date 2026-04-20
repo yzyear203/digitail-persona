@@ -4,7 +4,7 @@ import { ShieldCheck, Trash2, Info, Send, AlertTriangle, UserCircle, Key, Sparkl
 // ⚠️ 注意：为了在当前在线沙盒中正常预览，这里使用了 ESM 链接。
 // 当您将代码复制到本地并准备部署到 Vercel 时，请将下面这行改回：
 // import cloudbase from '@cloudbase/js-sdk';
-import cloudbase from 'https://esm.sh/@cloudbase/js-sdk';
+import cloudbase from '@cloudbase/js-sdk';
 
 // 🚀 系统级防白屏拦截机制
 let tcb = null;
