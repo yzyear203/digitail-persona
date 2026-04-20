@@ -1,64 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Trash2, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X, Mail, Smartphone, Lock, User, Hash } from 'lucide-react';
 
-// ⚠️⚠️⚠️ 解封指南 1：当你准备推送到 GitHub 和真实服务器时，请取消下面这行注释 ⚠️⚠️⚠️
-// import tcb from '@cloudbase/js-sdk';
+
+import tcb from '@cloudbase/js-sdk';
 
 // 🌟 1. 生产级腾讯云 TCB 初始化 (带防白屏保护与沙盒 Mock)
 let app, auth, db;
 
-// ======================= ⚠️ 沙盒环境 Mock 开始 (防 Canvas 白屏) ⚠️ =======================
-// ⚠️⚠️⚠️ 解封指南 2：当你准备推送到 GitHub 时，请删除下面这个【沙盒环境 Mock】代码块 ⚠️⚠️⚠️
-let authCallbacks = [];
-let mockCurrentUser = null;
-let mockDb = {};
-const triggerAuth = (user) => {
-  mockCurrentUser = user;
-  authCallbacks.forEach(cb => cb(user));
-};
-auth = {
-  getLoginState: async () => mockCurrentUser,
-  onLoginStateChanged: (cb) => { 
-    authCallbacks.push(cb); 
-    cb(mockCurrentUser); 
-    return () => { authCallbacks = authCallbacks.filter(f => f !== cb); }; 
-  },
-  getVerification: async () => { return true; },
-  signUp: async (opts) => {
-    triggerAuth({ user: { uid: 'mock-uid-' + Date.now(), email: opts.email || opts.phone_number || 'test@test.com' }, authType: 'EMAIL' });
-    return true;
-  },
-  signInWithEmailAndPassword: async (email, pass) => {
-    triggerAuth({ user: { uid: 'mock-uid-' + Date.now(), email }, authType: 'EMAIL' });
-    return true;
-  },
-  anonymousAuthProvider: () => ({
-    signIn: async () => {
-      triggerAuth({ user: { uid: 'anon-uid-' + Date.now(), email: null }, authType: 'ANONYMOUS' });
-      return true;
-    }
-  }),
-  signOut: async () => { triggerAuth(null); return true; }
-};
-db = {
-  collection: (col) => ({
-    where: () => ({
-      get: async () => ({ data: mockDb[col] || [] }),
-      watch: ({onChange}) => { onChange({docs:[]}); return { close: () => {} }; }
-    }),
-    add: async (data) => {
-      if(!mockDb[col]) mockDb[col] = [];
-      mockDb[col].push(data);
-      return true;
-    }
-  }),
-  serverDate: () => new Date().toISOString()
-};
-// ======================= ⚠️ 沙盒环境 Mock 结束 ⚠️ =======================
 
-// ======================= 真实 TCB 初始化 开始 (在此处解封) =======================
-// ⚠️⚠️⚠️ 解封指南 3：当你推送到 GitHub 时，请取消下面这段真实初始化的注释 ⚠️⚠️⚠️
-/* try {
+
+ try {
   app = tcb.init({
     env: import.meta.env?.VITE_TCB_ENV_ID || "persona-app-d9gkoxk5rd2f70aff"
   });
@@ -67,7 +18,7 @@ db = {
 } catch (error) {
   console.warn("TCB 初始化失败:", error);
 }
-*/
+
 // ======================= 真实 TCB 初始化 结束 =======================
 
 
@@ -397,9 +348,8 @@ export default function DigitalPersonaApp() {
   // --- API 通信底层 ---
   const callDoubaoAPI = async (promptText, systemInstructionText = null, imageParts = []) => {
     
-    // ⚠️⚠️⚠️ 解封指南 4：部署到真实的 GitHub/Vercel 环境时，请把这里的 true 改为 false ⚠️⚠️⚠️
-    // 开启 true 时走的是沙盒模拟大模型，确保你在 Canvas 预览时不报错。
-    const isSandboxEnv = true; 
+   
+    const isSandboxEnv = false; 
 
     if (isSandboxEnv) {
       await new Promise(res => setTimeout(res, 1200)); 
