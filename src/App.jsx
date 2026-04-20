@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Trash2, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X, Mail, Smartphone, Lock, User, Hash } from 'lucide-react';
-import cloudbase from '@cloudbase/js-sdk';
+
+// ⚠️ 修复沙盒编译报错：为了在当前网页预览环境中成功编译，临时使用了 CDN 链接。
+// 复制到您的本地项目时，请务必改回: import cloudbase from '@cloudbase/js-sdk';
+import cloudbase from 'https://esm.sh/@cloudbase/js-sdk';
 
 // 🚀 商业化标准配置：初始化腾讯云开发 (CloudBase) 单例
-// ⚠️ 注意：如果您在本地开发，建议使用 import.meta.env.VITE_TCB_ENV_ID 来读取环境变量
 const tcb = cloudbase.init({
-  env: "YOUR_TCB_ENV_ID" // 👈 请在这里填入您真实的腾讯云开发环境 ID
+  // ⚠️ 修复沙盒编译报错：网页沙盒无法识别 import.meta 语法。
+  // 复制到您的本地项目时，请务必将这里的字符串改回: import.meta.env.VITE_TCB_ENV_ID
+  env: "YOUR_TCB_ENV_ID"
 });
 const auth = tcb.auth({ persistence: 'local' });
 const db = tcb.database();
