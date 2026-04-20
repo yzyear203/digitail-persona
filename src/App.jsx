@@ -2,31 +2,39 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Trash2, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X, Mail, Smartphone, Lock, User, Hash } from 'lucide-react';
 import tcb from '@cloudbase/js-sdk';
 
-// 🌟 生产级腾讯云 TCB 初始化
+// 🌟 1. 腾讯云 TCB 初始化 (带防崩溃保护)
 let app, auth, db;
 try {
   app = tcb.init({
-    env: import.meta.env.VITE_TCB_ENV_ID || "persona-app-d9gkoxk5rd2f70aff"
+    env: import.meta.env?.VITE_TCB_ENV_ID || "persona-app-d9gkoxk5rd2f70aff"
   });
   auth = app.auth();
   db = app.database();
 } catch (error) {
-  console.error("腾讯云 TCB 初始化失败，请检查环境变量配置:", error);
+  console.warn("⚠️ 预览环境警告：腾讯云 TCB 初始化失败，可能导致登录无反应。真实部署时此警告将消失。", error);
 }
 
-// 🌟 打字机引擎 (保持不变)
+// 🌟 2. 满血版打字机引擎 (精准还原停顿与删改)
 const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
   const [displayText, setDisplayText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
   const onCompleteRef = useRef(onComplete);
+  
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
   useEffect(() => {
     let isMounted = true;
     const actions = [];
-    let baseSpeed = 220; let deleteSpeed = 80;
-    if (persona.includes('细腻') || persona.includes('犹豫') || persona.includes('慢') || persona.includes('斟酌')) { baseSpeed = 400; deleteSpeed = 120; } 
-    else if (persona.includes('急躁') || persona.includes('快') || persona.includes('心直口快')) { baseSpeed = 120; deleteSpeed = 40; }
+    
+    let baseSpeed = 220; 
+    let deleteSpeed = 80;
+    if (persona.includes('细腻') || persona.includes('犹豫') || persona.includes('慢') || persona.includes('斟酌')) {
+      baseSpeed = 400; 
+      deleteSpeed = 120;
+    } else if (persona.includes('急躁') || persona.includes('快') || persona.includes('心直口快')) {
+      baseSpeed = 120; 
+      deleteSpeed = 40;
+    }
 
     const parts = content.split(/(<del>.*?<\/del>)/g);
     parts.forEach(part => {
@@ -41,7 +49,9 @@ const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
       }
     });
 
-    let currentText = ''; let index = 0;
+    let currentText = '';
+    let index = 0;
+
     const runAction = () => {
       if (!isMounted) return;
       if (index >= actions.length) {
@@ -49,18 +59,26 @@ const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
         if (onCompleteRef.current) onCompleteRef.current();
         return;
       }
+
       const action = actions[index];
       let delay = baseSpeed + (Math.random() * 100 - 50); 
+
       if (action.type === 'type') {
-        currentText += action.char; setDisplayText(currentText);
+        currentText += action.char;
+        setDisplayText(currentText);
         if (Math.random() < 0.05) delay += 300 + Math.random() * 400;
       } else if (action.type === 'delete') {
-        currentText = currentText.slice(0, -1); setDisplayText(currentText); delay = deleteSpeed; 
-      } else if (action.type === 'pause') { delay = action.ms; }
+        currentText = currentText.slice(0, -1);
+        setDisplayText(currentText);
+        delay = deleteSpeed; 
+      } else if (action.type === 'pause') {
+        delay = action.ms;
+      }
 
       if (scrollRef && scrollRef.current) scrollRef.current.scrollIntoView({ behavior: 'auto' });
       index++; setTimeout(runAction, delay);
     };
+
     runAction();
     return () => { isMounted = false; };
   }, [content, persona, scrollRef]);
@@ -73,6 +91,7 @@ const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
   );
 };
 
+// 🌟 3. 主程序组件
 export default function DigitalPersonaApp() {
   const [appPhase, setAppPhase] = useState('home'); 
   const [messages, setMessages] = useState([]);
@@ -86,17 +105,16 @@ export default function DigitalPersonaApp() {
   const [showTasksModal, setShowTasksModal] = useState(false);
   const [showComplianceBanner, setShowComplianceBanner] = useState(true); 
 
-  // 🌟 核心升级：标准五步账号系统状态
-  const [authMethod, setAuthMethod] = useState('email'); // 'email' 或 'phone'
+  // --- 账号系统状态 ---
+  const [authMethod, setAuthMethod] = useState('email'); 
   const [isLoginMode, setIsLoginMode] = useState(true);
+  const [nickname, setNickname] = useState(''); 
+  const [account, setAccount] = useState(''); 
+  const [password, setPassword] = useState(''); 
+  const [confirmPassword, setConfirmPassword] = useState(''); 
+  const [verificationCode, setVerificationCode] = useState(''); 
   
-  const [nickname, setNickname] = useState(''); // 行1: 用户名
-  const [account, setAccount] = useState(''); // 行2: 账号(邮箱/手机)
-  const [password, setPassword] = useState(''); // 行3: 密码
-  const [confirmPassword, setConfirmPassword] = useState(''); // 行4: 确认密码
-  const [verificationCode, setVerificationCode] = useState(''); // 行5: 验证码
-  
-  const [countdown, setCountdown] = useState(0); // 倒计时状态
+  const [countdown, setCountdown] = useState(0); 
   const [authError, setAuthError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [showAgreementModal, setShowAgreementModal] = useState(false);
@@ -104,7 +122,6 @@ export default function DigitalPersonaApp() {
 
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null); 
-  
   const [savedPersonas, setSavedPersonas] = useState([]);
   const [uploadedFiles, setUploadedFiles] = useState([]); 
   const [distillProgress, setDistillProgress] = useState(0);
@@ -115,18 +132,13 @@ export default function DigitalPersonaApp() {
   const terminalEndRef = useRef(null);
   const fileInputRef = useRef(null); 
 
-  // 🌟 验证码倒计时逻辑
+  // --- 发送验证码 ---
   useEffect(() => {
     let timer;
-    if (countdown > 0) {
-      timer = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-    }
+    if (countdown > 0) timer = setInterval(() => setCountdown(prev => prev - 1), 1000);
     return () => clearInterval(timer);
   }, [countdown]);
 
-  // 🚀 核心修复：真实调用腾讯云 v2 发送验证码接口
   const handleSendCode = async () => {
     if (!account) {
       setAuthError(`请先在第二行填写您的${authMethod === 'email' ? '邮箱' : '手机号'}！`);
@@ -134,25 +146,23 @@ export default function DigitalPersonaApp() {
     }
     setAuthError('');
     try {
-      // 腾讯云 Web SDK v2/v3 标准的发送验证码方法
+      if (!auth) throw new Error("环境未配置，无法发送");
       if (authMethod === 'email') {
         await auth.getVerification({ email: account });
       } else {
         await auth.getVerification({ phone_number: account });
       }
-      
       setCountdown(60);
       alert(`✅ 验证码已成功发送至：${account}\n(若为邮箱，请注意检查垃圾箱)`);
     } catch (err) {
       console.error("发送验证码错误:", err);
-      setAuthError("验证码发送失败: " + (err.message || "请检查腾讯云后台相关配置是否开启"));
+      setAuthError("验证码发送失败: " + (err.message || "请检查后台配置"));
     }
   };
 
-  const generateUniqueId = () => {
-    return 'UID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-  };
+  const generateUniqueId = () => 'UID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
 
+  // --- 身份与档案监听 ---
   useEffect(() => {
     if (!auth) return;
     const loadUserProfile = async (uid, email, isAnon) => {
@@ -161,6 +171,7 @@ export default function DigitalPersonaApp() {
         return;
       }
       try {
+        if (!db) return;
         const res = await db.collection('users').where({ uid: uid }).get();
         if (res.data && res.data.length > 0) {
           setUserProfile(res.data[0]); 
@@ -191,6 +202,7 @@ export default function DigitalPersonaApp() {
     return () => { if(typeof unsubscribe === 'function') unsubscribe(); };
   }, []);
 
+  // --- 记忆库加载 ---
   useEffect(() => {
     if (!user || user.isAnonymous || !db) { setSavedPersonas([]); return; }
     const watcher = db.collection('personas').where({ owner: user.uid }).watch({
@@ -208,31 +220,24 @@ export default function DigitalPersonaApp() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTypingIndicator]);
   useEffect(() => { terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [distillLogs]);
 
-  const handleAgreeAndProceed = () => {
-    setShowAgreementModal(false);
-    if (user && !user.isAnonymous) setAppPhase('dashboard');
-    else setAppPhase('auth');
-  };
-
-  // 🚀 核心修复：提交注册逻辑适配带验证码的新接口
+  // --- 核心认证逻辑 ---
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
     setIsAuthenticating(true);
 
     try {
+      if (!auth) throw new Error("数据库连接断开，请检查网络或环境变量。");
+      
       if (!isLoginMode) {
-        // 注册模式：严格校验 5 项输入
         if (!nickname.trim()) throw new Error("第一行：请填写您的用户名");
         if (!account.trim()) throw new Error(`第二行：请填写您的${authMethod === 'email' ? '邮箱' : '手机号'}`);
         if (password.length < 6) throw new Error("第三行：密码至少需要 6 位字符");
         if (password !== confirmPassword) throw new Error("第四行：两次输入的密码不一致！");
         if (!verificationCode.trim()) throw new Error("第五行：请输入您收到的验证码");
 
-        // 缓存昵称用于数据库初始化
         localStorage.setItem('temp_nickname', nickname.trim());
         
-        // 调用 v2 官方标准方法：带验证码和密码直接注册
         try {
           if (authMethod === 'email') {
             await auth.signUp({ email: account, password: password, code: verificationCode });
@@ -240,20 +245,14 @@ export default function DigitalPersonaApp() {
             await auth.signUp({ phone_number: account, password: password, code: verificationCode });
           }
         } catch (innerErr) {
-          // 为了防止有些用户的控制台只开了“验证码登录”，做一层稳妥降级
-          console.error("标准注册失败，尝试安全降级:", innerErr);
-          if (innerErr.message && innerErr.message.includes('not a function')) {
-            throw new Error("SDK版本过旧，无法使用验证码注册，请退回密码模式或更新 SDK。");
-          } else {
-            throw innerErr;
-          }
+          console.error("注册报错:", innerErr);
+          throw new Error("SDK限制或验证码失效，请确认后台开启了带密码验证码注册，报错: " + innerErr.message);
         }
         
         alert("🎉 账号创建成功！\n您的专属 UID 已分配，现在为您进入系统。");
         setAppPhase('dashboard');
         
       } else {
-        // 登录模式：只需校验账号密码
         await auth.signInWithEmailAndPassword(account, password);
         setAppPhase('dashboard');
       }
@@ -265,7 +264,7 @@ export default function DigitalPersonaApp() {
       else if (msg.includes('wrong password') || msg.includes('密码')) errorMsg = '安全密码错误，请重新输入！';
       else if (msg.includes('already exists') || msg.includes('已注册')) errorMsg = '该账号已被注册，请直接登录。';
       else if (msg.includes('验证码') || msg.includes('verify')) errorMsg = '验证码错误或已过期，请重新获取。';
-      else errorMsg = "底层报错: " + msg; // 将真实报错打印出来，方便最终排查
+      else errorMsg = "登录异常: " + msg;
       setAuthError(errorMsg);
     } finally {
       setIsAuthenticating(false);
@@ -274,8 +273,11 @@ export default function DigitalPersonaApp() {
 
   const handleGuestAuth = async () => {
     setAuthError(''); setIsAuthenticating(true);
-    try { await auth.anonymousAuthProvider().signIn(); setAppPhase('dashboard'); } 
-    catch (err) { setAuthError("游客登录失败: " + err.message); } 
+    try { 
+      if (!auth) throw new Error("无法连接认证服务器");
+      await auth.anonymousAuthProvider().signIn(); 
+      setAppPhase('dashboard'); 
+    } catch (err) { setAuthError("游客登录失败: " + err.message); } 
     finally { setIsAuthenticating(false); }
   };
 
@@ -284,7 +286,43 @@ export default function DigitalPersonaApp() {
     setAppPhase('home'); setMessages([]); setSavedPersonas([]); setUploadedFiles([]); setIsResponding(false); setUserProfile(null);
   };
 
-  // --- 文件处理与 AI 逻辑部分 (保持不变) ---
+  // --- API 与 大模型通信 (包含沙盒防护) ---
+  const callDoubaoAPI = async (promptText, systemInstructionText = null, imageParts = []) => {
+    // ⚠️⚠️⚠️ 部署到 GITHUB 时，请把这里的 true 改成 false！⚠️⚠️⚠️
+    // 这样它才会真正去调用你的 /api/generate 后端接口。
+    // 设置为 true 时，系统会直接返回模拟数据，防止在 Canvas 预览时报错白屏。
+    const isSandboxEnv = true; 
+
+    if (isSandboxEnv) {
+      await new Promise(res => setTimeout(res, 1000));
+      if (promptText.includes("用户上传了上述包含真实聊天记录")) {
+         return "我是一个被临时模拟出来的人格，心思非常细腻。好的，好的，我知道了。<del>其实我不想处理。</del> 打字速度：慢；删改频率：高。";
+      }
+      return `收到你的消息了。|||<del>这个问题有点烦人，</del>我会尽快处理。|||大概需要十分钟。`;
+    } 
+    
+    // --- 以下是真实的后端 Fetch 逻辑 ---
+    let messages = []; if (systemInstructionText) messages.push({ role: "system", content: systemInstructionText });
+    let userContent = [];
+    if (imageParts.length > 0) {
+      userContent.push({ type: "text", text: promptText });
+      imageParts.forEach(img => userContent.push({ type: "image_url", image_url: { url: `data:${img.mimeType};base64,${img.base64Data}` } }));
+      messages.push({ role: "user", content: userContent });
+    } else { messages.push({ role: "user", content: promptText }); }
+    
+    const fetchWithRetry = async (retries = 3, delay = 1000) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const response = await fetch('/api/generate', { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages }) });
+          if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(`HTTP ${response.status} - ${errData.error || '请求被拒绝'}`); }
+          return await response.json();
+        } catch (e) { if (i === retries - 1) throw e; await new Promise(res => setTimeout(res, delay * Math.pow(2, i))); }
+      }
+    };
+    const data = await fetchWithRetry(); return data.choices?.[0]?.message?.content || "";
+  };
+
+  // --- 图片处理 ---
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
@@ -310,44 +348,6 @@ export default function DigitalPersonaApp() {
           } else resolve({ name: f.name, warning: "仅支持图片与txt" });
         });
       })); setUploadedFiles(prev => [...prev, ...newFiles]);
-    }
-  };
-
-  const callDoubaoAPI = async (promptText, systemInstructionText = null, imageParts = []) => {
-    const isSandboxEnv = typeof __firebase_config !== 'undefined';
-    if (isSandboxEnv) {
-      const apiKey = ""; const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-      const parts = [{ text: promptText }];
-      if (imageParts.length > 0) { imageParts.forEach(img => { parts.push({ inlineData: { mimeType: img.mimeType, data: img.base64Data } }); }); }
-      const payload = { contents: [{ parts }] };
-      if (systemInstructionText) { payload.systemInstruction = { parts: [{ text: systemInstructionText }] }; }
-      const fetchWithRetry = async (retries = 3, delay = 1000) => {
-        for (let i = 0; i < retries; i++) {
-          try {
-            const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-            if (!response.ok) throw new Error("API 报错"); return await response.json();
-          } catch (e) { if (i === retries - 1) throw e; await new Promise(res => setTimeout(res, delay * Math.pow(2, i))); }
-        }
-      };
-      const data = await fetchWithRetry(); return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    } else {
-      let messages = []; if (systemInstructionText) messages.push({ role: "system", content: systemInstructionText });
-      let userContent = [];
-      if (imageParts.length > 0) {
-        userContent.push({ type: "text", text: promptText });
-        imageParts.forEach(img => userContent.push({ type: "image_url", image_url: { url: `data:${img.mimeType};base64,${img.base64Data}` } }));
-        messages.push({ role: "user", content: userContent });
-      } else { messages.push({ role: "user", content: promptText }); }
-      const fetchWithRetry = async (retries = 3, delay = 1000) => {
-        for (let i = 0; i < retries; i++) {
-          try {
-            const response = await fetch('/api/generate', { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages }) });
-            if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(`HTTP ${response.status} - ${errData.error || '请求被拒绝'}`); }
-            return await response.json();
-          } catch (e) { if (i === retries - 1) throw e; await new Promise(res => setTimeout(res, delay * Math.pow(2, i))); }
-        }
-      };
-      const data = await fetchWithRetry(); return data.choices?.[0]?.message?.content || "";
     }
   };
 
@@ -383,6 +383,7 @@ export default function DigitalPersonaApp() {
     } catch (error) { setDistillLogs(prev => [...prev, `[致命错误] 后端管线崩溃: ${error.message}`]); }
   };
 
+  // 🌟 恢复的发送消息逻辑：精准计算停顿，拒绝一次性吐出所有消息
   const handleSendMessage = async (e) => {
     e.preventDefault(); if (!input.trim()) return;
     const userText = input; const newMsg = { id: Date.now(), role: 'user', text: userText, time: new Date().toLocaleTimeString() };
@@ -394,16 +395,24 @@ export default function DigitalPersonaApp() {
       const chatHistory = messages.filter(m => m.role !== 'system').map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text.replace(/<del>.*?<\/del>/g, '')}`).join('\n');
       const prompt = `对话历史:\n${chatHistory}\n\nUser: ${userText}\nAssistant:`;
       const systemInstruction = `你是一个数字备份人格。请严格遵循以下设定：\n\n${activePersona}\n\n请用这个身份、第一人称代替用户处理事务。拒绝复读与强行加戏。为了展示人类打字犹豫感，必须在输出中使用 <del>删掉的话</del> 标签！长句强制加，短句随机加。使用 "|||" 切分多条消息。`;
+      
       const responseText = await callDoubaoAPI(prompt, systemInstruction);
       if (currentInteractionRef.current !== interactionId) return;
+      
       const replyParts = responseText.split('|||').map(s => s.trim()).filter(s => s);
       setIsTypingIndicator(false); 
+      
       for (let i = 0; i < replyParts.length; i++) {
         if (currentInteractionRef.current !== interactionId) break;
         const msgId = Date.now() + i;
         setMessages((prev) => [...prev, { id: msgId, role: 'assistant', text: replyParts[i], time: new Date().toLocaleTimeString(), isAnimated: true }]);
+        
+        // 核心时间估算，控制渲染下一条消息的延迟
         const plainTextLength = replyParts[i].replace(/<del>.*?<\/del>/g, '').length;
-        const estimatedVisualTime = plainTextLength * 250 + 1000; 
+        const delTextLength = (replyParts[i].match(/<del>(.*?)<\/del>/g) || []).join('').replace(/<del>|<\/del>/g, '').length;
+        const delTagsCount = (replyParts[i].match(/<del>/g) || []).length;
+        const estimatedVisualTime = plainTextLength * 250 + delTextLength * 300 + delTagsCount * 1500 + 1000; 
+        
         if (i < replyParts.length - 1) await new Promise(resolve => setTimeout(resolve, estimatedVisualTime));
       }
     } catch (error) {
@@ -434,6 +443,13 @@ export default function DigitalPersonaApp() {
     try { await db.collection('personas').doc(personaId).remove(); } catch (err) { console.error(err); }
   };
 
+  const handleAgreeAndProceed = () => {
+    setShowAgreementModal(false);
+    if (user && !user.isAnonymous) setAppPhase('dashboard');
+    else setAppPhase('auth');
+  };
+
+  // --- UI 渲染层 ---
   if (appPhase === 'home') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center pt-20 pb-10 px-6 font-sans">
@@ -500,7 +516,6 @@ export default function DigitalPersonaApp() {
     );
   }
 
-  // 🌟 终极注册/登录 UI：严格按照 5 行布局，打通底层接口
   if (appPhase === 'auth') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans py-12">
@@ -605,11 +620,9 @@ export default function DigitalPersonaApp() {
     );
   }
 
-  // 🌟 工作台界面
   if (appPhase === 'dashboard') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center p-6 font-sans">
-        
         <div className="w-full max-w-5xl flex justify-end mb-6">
           <div className="bg-white border border-slate-200 shadow-sm rounded-2xl px-5 py-2.5 flex items-center space-x-5">
             <div className="flex items-center space-x-3 border-r border-slate-100 pr-5">
