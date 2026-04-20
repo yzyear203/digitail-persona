@@ -286,20 +286,12 @@ export default function DigitalPersonaApp() {
     setAppPhase('home'); setMessages([]); setSavedPersonas([]); setUploadedFiles([]); setIsResponding(false); setUserProfile(null);
   };
 
-  // --- API 与 大模型通信 (包含沙盒防护) ---
-  const callDoubaoAPI = async (promptText, systemInstructionText = null, imageParts = []) => {
-    // ⚠️⚠️⚠️ 部署到 GITHUB 时，请把这里的 true 改成 false！⚠️⚠️⚠️
-    // 这样它才会真正去调用你的 /api/generate 后端接口。
-    // 设置为 true 时，系统会直接返回模拟数据，防止在 Canvas 预览时报错白屏。
-    const isSandboxEnv = true; 
 
-    if (isSandboxEnv) {
-      await new Promise(res => setTimeout(res, 1000));
-      if (promptText.includes("用户上传了上述包含真实聊天记录")) {
-         return "我是一个被临时模拟出来的人格，心思非常细腻。好的，好的，我知道了。<del>其实我不想处理。</del> 打字速度：慢；删改频率：高。";
-      }
-      return `收到你的消息了。|||<del>这个问题有点烦人，</del>我会尽快处理。|||大概需要十分钟。`;
-    } 
+  const callDoubaoAPI = async (promptText, systemInstructionText = null, imageParts = []) => {
+   
+    const isSandboxEnv = false; 
+
+ 
     
     // --- 以下是真实的后端 Fetch 逻辑 ---
     let messages = []; if (systemInstructionText) messages.push({ role: "system", content: systemInstructionText });
