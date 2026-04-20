@@ -7,7 +7,7 @@ import cloudbase from '@cloudbase/js-sdk';
 // 🚀 商业化标准配置：初始化腾讯云开发 (CloudBase) 单例
 const tcb = cloudbase.init({
  
-  import.meta.env.VITE_TCB_ENV_ID
+  env:import.meta.env.VITE_TCB_ENV_ID
 });
 const auth = tcb.auth({ persistence: 'local' });
 const db = tcb.database();
