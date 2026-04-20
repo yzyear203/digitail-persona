@@ -431,7 +431,7 @@ export default function DigitalPersonaApp() {
       setTimeout(() => {
         setDistillLogs(prev => [...prev, "[编译成功] 视觉模型处理完毕！正在挂载底层对话引擎..."]); setDistillProgress(100);
         setTimeout(() => {
-          setMessages([{ id: 1, role: 'system', text: '已通过认证。基于上传素材解析完毕，处于【自主人格】接管模式。', time: new Date().toLocaleTimeString(), isAnimated: false }, { id: 2, role: 'assistant', text: `您好，我已经理解了您的意思。我现在是数字分身，请问有什么事？`, time: new Date().toLocaleTimeString(), isAnimated: true }]);
+          setMessages([{ id: 1, role: 'system', text: '已通过认证。基于上传素材解析完毕，处于【自主人格】接管模式。', time: new Date().toLocaleTimeString(), isAnimated: false }, { id: 2, role: 'assistant', text: `你好呀！`, time: new Date().toLocaleTimeString(), isAnimated: true }]);
           setAppPhase('chat');
         }, 1500);
       }, 1000);
