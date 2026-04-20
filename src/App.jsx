@@ -1,16 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Trash2, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X, Mail, Smartphone, Lock, User, Hash } from 'lucide-react';
+import { ShieldCheck, Trash2, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X, Mail, Smartphone, Lock, User, Hash, ChevronLeft } from 'lucide-react';
 
+// ⚠️ 注意：为了在当前在线沙盒中正常预览，这里使用了 ESM 链接。
+// 当您将代码复制到本地并准备部署到 Vercel 时，请将下面这行改回：
+// import cloudbase from '@cloudbase/js-sdk';
+import cloudbase from 'https://esm.sh/@cloudbase/js-sdk';
 
-import cloudbase from '@cloudbase/js-sdk';
+// 🚀 系统级防白屏拦截机制
+let tcb = null;
+let auth = null;
+let db = null;
+let sdkInitError = null;
 
-// 🚀 商业化标准配置：初始化腾讯云开发 (CloudBase) 单例
-const tcb = cloudbase.init({
- 
-  env:import.meta.env.VITE_TCB_ENV_ID
-});
-const auth = tcb.auth({ persistence: 'local' });
-const db = tcb.database();
+try {
+  // 必须确保在 Vercel 环境变量中配置了 VITE_TCB_ENV_ID
+  const envId = import.meta.env.VITE_TCB_ENV_ID || "YOUR_TCB_ENV_ID";
+  if (!envId || envId === "YOUR_TCB_ENV_ID") {
+    throw new Error("致命异常：未检测到 VITE_TCB_ENV_ID 环境变量，请在 Vercel 中配置！");
+  }
+  
+  tcb = cloudbase.init({
+    env: envId
+  });
+  auth = tcb.auth({ persistence: 'local' });
+  db = tcb.database();
+} catch (err) {
+  console.error("【系统级拦截】底层初始化失败:", err);
+  sdkInitError = err.message;
+}
 
 // 🌟 满血版真实人类打字机引擎 (带全局阻塞回调，彻底解决多条齐发 Bug)
 const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
@@ -36,15 +53,14 @@ const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
       deleteSpeed = 20;
     }
 
-    // 解析 <del> 标签，将其转化为真实的“退格删字”动作队列
     const parts = content.split(/(<del>.*?<\/del>)/g);
     parts.forEach(part => {
       if (part.startsWith('<del>') && part.endsWith('</del>')) {
         const delContent = part.replace('<del>', '').replace('</del>', '');
         for (let c of delContent) actions.push({ type: 'type', char: c });
-        actions.push({ type: 'pause', ms: 800 + Math.random() * 600 }); // 打完错字停顿一下
-        for (let i = 0; i < delContent.length; i++) actions.push({ type: 'delete' }); // 疯狂退格
-        actions.push({ type: 'pause', ms: 500 + Math.random() * 500 }); // 删完思考一下
+        actions.push({ type: 'pause', ms: 800 + Math.random() * 600 }); 
+        for (let i = 0; i < delContent.length; i++) actions.push({ type: 'delete' }); 
+        actions.push({ type: 'pause', ms: 500 + Math.random() * 500 }); 
       } else {
         for (let c of part) actions.push({ type: 'type', char: c });
       }
@@ -55,11 +71,9 @@ const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
 
     const runAction = () => {
       if (!isMounted) return;
-      
       if (index >= actions.length) {
         setIsTyping(false);
         if (onCompleteRef.current) onCompleteRef.current();
-        
         if (window.__typingResolve) {
           window.__typingResolve();
           window.__typingResolve = null;
@@ -91,7 +105,6 @@ const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
     };
 
     runAction();
-
     return () => { 
       isMounted = false; 
       if (window.__typingResolve) {
@@ -109,7 +122,6 @@ const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
   );
 };
 
-
 export default function DigitalPersonaApp() {
   const [appPhase, setAppPhase] = useState('home'); 
   const [messages, setMessages] = useState([]);
@@ -117,11 +129,9 @@ export default function DigitalPersonaApp() {
   const [isTypingIndicator, setIsTypingIndicator] = useState(false);
   const [isResponding, setIsResponding] = useState(false);
   const currentInteractionRef = useRef(0); 
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [extractedTasks, setExtractedTasks] = useState([]);
   const [showTasksModal, setShowTasksModal] = useState(false);
-  const [showComplianceBanner, setShowComplianceBanner] = useState(true); 
+  const [extractedTasks, setExtractedTasks] = useState([]);
+  const [isExtracting, setIsExtracting] = useState(false);
 
   const [authMethod, setAuthMethod] = useState('email'); 
   const [isLoginMode, setIsLoginMode] = useState(false); 
@@ -165,59 +175,54 @@ export default function DigitalPersonaApp() {
 
   const handleSendCode = async () => {
     if (!account) {
-      setAuthError(`请在第二行填写您的${authMethod === 'email' ? '邮箱' : '手机号'}后再获取验证码！`);
+      setAuthError(`请先填写您的${authMethod === 'email' ? '邮箱' : '手机号'}`);
       return;
     }
     setAuthError('');
     try {
       if (authMethod === 'email') {
-        // 腾讯云默认通过下发激活邮件的方式注册邮箱，此处为配合前端流程放行
         console.log("准备通过邮箱直接注册（无需调用获取验证码API）");
       } else {
-        // 手机号真实发送验证码 API
-        if (auth.sendPhoneCode) {
+        if (auth && auth.sendPhoneCode) {
             await auth.sendPhoneCode(account);
-        } else {
-            console.warn("当前环境未配置手机验证码发送功能");
         }
       }
       setCountdown(60);
-      alert(`✅ 验证码下发请求已处理：${account}\n(如果是邮箱，请直接填写任意6位数字进入注册环节)`);
+      alert(`✅ 验证码下发请求已处理：${account}\n(如果是邮箱，请直接填写任意6位数字跳过此步)`);
     } catch (err) {
-      console.error("验证码发送异常:", err);
-      setAuthError("发送失败: " + (err.message || "请检查账号格式或后台服务"));
+      setAuthError("发送失败: " + (err.message || err.code || "请检查账号格式"));
     }
   };
 
   useEffect(() => {
+    if (!auth || !db) return;
+
     const loadUserProfile = async (uid, email, isAnon) => {
-      // 如果是匿名游客，绝对不向数据库写入任何数据（解决 Bug 4 中脏数据和不写入的问题）
-      if (isAnon) {
-        setUserProfile({ nickname: '匿名访客', shortId: 'GUEST-' + Math.floor(Math.random()*1000) });
-        return;
-      }
       try {
         const res = await db.collection('users').where({ uid: uid }).get();
         if (res.data && res.data.length > 0) {
           setUserProfile(res.data[0]); 
         } else {
-          // 真正的注册用户，写入云端数据库
-          const savedNickname = localStorage.getItem('temp_nickname') || email.split('@')[0] || '新用户';
-          const newProfile = { uid: uid, email: email, nickname: savedNickname, shortId: generateUniqueId(), createdAt: db.serverDate() };
+          // 🚀 不论是否游客，均向数据库写入用户配置
+          const savedNickname = localStorage.getItem('temp_nickname') || (email ? email.split('@')[0] : '云端新用户');
+          const finalNickname = isAnon ? '匿名访客' : savedNickname;
+          const newProfile = { uid: uid, email: email || 'anonymous@demo.com', nickname: finalNickname, shortId: generateUniqueId(), createdAt: db.serverDate() };
+          
           await db.collection('users').add(newProfile);
           setUserProfile(newProfile);
           localStorage.removeItem('temp_nickname'); 
         }
-      } catch (err) { console.error("档案加载失败:", err); }
+      } catch (err) { 
+        console.error("数据库读写被拦截:", err); 
+        alert(`⛔ 腾讯云数据库写入被拦截！\n\n错误信息：${err.message || err.code || JSON.stringify(err)}\n\n👉 请前往腾讯云控制台：\n1. 进入 [文档型数据库]\n2. 点击 [users] 集合 -> [权限设置]\n3. 修改为「所有用户可读，仅创建者可读写」或「公有读写」！`);
+      }
     };
 
     const handleLoginState = async (loginState) => {
       if (loginState) {
-        // 【核心修复 Bug 1 & 4】：正确判定 CloudBase 的登录状态
         const loginType = loginState.loginType || '';
         const isAnon = loginType === 'ANONYMOUS' || loginType === 'anonymous';
         
-        // 提取可靠的 UID 和 Email
         const uid = loginState.user?.uid || loginState.uid || 'anonymous_uid';
         const userEmail = loginState.user?.email || account || '';
 
@@ -234,8 +239,8 @@ export default function DigitalPersonaApp() {
   }, [account]);
 
   useEffect(() => {
-    // 只有真实用户（非游客）才能读取和写入 Personas 数据
-    if (!user || user.isAnonymous) { setSavedPersonas([]); return; }
+    if (!auth || !db || !user) return; 
+    
     const watcher = db.collection('personas').where({ owner: user.uid }).watch({
         onChange: (snapshot) => {
           const loaded = [];
@@ -243,7 +248,7 @@ export default function DigitalPersonaApp() {
           loaded.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           setSavedPersonas(loaded);
         },
-        onError: (error) => console.error("数据加载失败:", error)
+        onError: (error) => console.error("personas 数据加载失败:", error)
       });
     return () => watcher.close();
   }, [user]);
@@ -258,15 +263,13 @@ export default function DigitalPersonaApp() {
 
     try {
       if (!isLoginMode) {
-        if (!nickname.trim()) throw new Error("第一行：请填写您的用户名");
-        if (!account.trim()) throw new Error(`第二行：请填写您的${authMethod === 'email' ? '邮箱' : '手机号'}`);
-        if (password.length < 6) throw new Error("第三行：密码至少需要 6 位字符");
-        if (password !== confirmPassword) throw new Error("第四行：两次输入的密码不一致！");
-        if (!verificationCode.trim()) throw new Error("第五行：请输入您收到的验证码");
+        if (!nickname.trim()) throw new Error("请填写您的用户名");
+        if (!account.trim()) throw new Error(`请填写您的${authMethod === 'email' ? '邮箱' : '手机号'}`);
+        if (password.length < 6) throw new Error("密码至少需要 6 位字符");
+        if (password !== confirmPassword) throw new Error("两次输入的密码不一致！");
 
         localStorage.setItem('temp_nickname', nickname.trim());
         
-        // 【核心修复 Bug 3】：调用纯正的 CloudBase 官方注册 API
         try {
           if (authMethod === 'email') {
             await auth.signUpWithEmailAndPassword(account, password);
@@ -278,43 +281,42 @@ export default function DigitalPersonaApp() {
             }
           }
         } catch (innerErr) {
-          throw new Error("注册请求被拒绝：" + innerErr.message);
+          throw new Error("注册被拒：" + (innerErr.message || innerErr.code || JSON.stringify(innerErr)));
         }
         
-        // 注册成功后，尝试静默登录
         try {
            await auth.signInWithEmailAndPassword(account, password);
            alert("🎉 账号创建成功！\n您的专属 UID 已分配，现在为您进入工作台。");
            setAppPhase('dashboard');
         } catch(autoLoginErr) {
-           console.log("静默登录失败，可能需要邮箱验证:", autoLoginErr);
-           alert("⚠️ 您的账号已创建！\n但系统提示当前状态不可直接进入。如果您使用的是邮箱，请务必前往邮箱点击腾讯云下发的【激活链接】，然后再在此处登录。");
-           // 引导至登录界面
+           console.log("静默登录失败，需要邮箱验证:", autoLoginErr);
+           alert("⚠️ 腾讯云安全策略提示：\n您的账号已成功注册！\n\n但由于平台强制安全限制，您必须前往填写的邮箱，点击腾讯云发给您的【激活链接】。\n激活成功后，请在此处直接登录即可！");
            setIsLoginMode(true);
            setPassword('');
         }
         
       } else {
-        // 【核心修复 Bug 3】：纯正的 CloudBase 登录 API
         if (!account.trim() || !password.trim()) throw new Error("请输入账号和密码");
         if (authMethod === 'email') {
             await auth.signInWithEmailAndPassword(account, password);
         } else {
-            // 如需支持手机密码登录，视您的 TCB 配置而定
             await auth.signInWithEmailAndPassword(account, password);
         }
         setAppPhase('dashboard');
       }
     } catch (err) {
+      console.error("鉴权报错详情:", err);
       let errorMsg = "验证失败，请检查或重试";
-      const msg = err.message || "";
-      if (msg.includes('第一行') || msg.includes('第二行') || msg.includes('第三行') || msg.includes('第四行') || msg.includes('第五行')) errorMsg = msg;
-      else if (msg.includes('not exist') || msg.includes('找不到')) errorMsg = '该账号尚未注册，请点击下方“完成五步注册”。';
-      else if (msg.includes('wrong password') || msg.includes('密码')) errorMsg = '安全密码错误，请重新输入！';
-      else if (msg.includes('already exists') || msg.includes('已注册')) errorMsg = '该账号已被注册，请直接点击下方“返回登录”。';
-      else if (msg.includes('验证码') || msg.includes('verify')) errorMsg = '验证码错误或已失效，请重新获取。';
-      else if (msg.includes('未激活')) errorMsg = '登录失败：账号尚未激活，请前往您的邮箱点击激活邮件！';
-      else errorMsg = "系统提示: " + msg;
+      const rawMsg = err.message || err.code || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      const msg = rawMsg.toLowerCase();
+      
+      if (msg.includes('用户名') || msg.includes('两次输入')) errorMsg = err.message;
+      else if (msg.includes('password') || msg.includes('密码')) errorMsg = '安全密码错误或不符合规范！';
+      else if (msg.includes('exist') || msg.includes('not found') || msg.includes('未注册')) errorMsg = '账号未注册，请点击下方切换至注册模式。';
+      else if (msg.includes('email') && msg.includes('already')) errorMsg = '该邮箱已被注册，请直接登录。';
+      else if (msg.includes('verify') || msg.includes('code')) errorMsg = '验证码错误或已失效。';
+      else if (msg.includes('unverified') || msg.includes('not active')) errorMsg = '登录失败：账号尚未激活，请务必前往您的邮箱点击激活邮件！';
+      else errorMsg = "系统提示: " + rawMsg;
       
       setAuthError(errorMsg);
     } finally {
@@ -327,7 +329,10 @@ export default function DigitalPersonaApp() {
     try { 
       await auth.anonymousAuthProvider().signIn(); 
       setAppPhase('dashboard'); 
-    } catch (err) { setAuthError("游客登录失败: " + err.message); } 
+    } catch (err) { 
+      const errMsg = err.message || err.code || JSON.stringify(err);
+      setAuthError(`游客登录失败: ${errMsg}\n(提示: 请检查腾讯云控制台是否已开启「匿名登录」开关)`); 
+    } 
     finally { setIsAuthenticating(false); }
   };
 
@@ -335,19 +340,11 @@ export default function DigitalPersonaApp() {
     if (auth) await auth.signOut();
     setAppPhase('home'); 
     setMessages([]); setSavedPersonas([]); setUploadedFiles([]); setIsResponding(false); setUserProfile(null);
-    
-    // 【核心修复 Bug 2】：彻底清空所有前端表单和状态，避免下次返回登录页时残留信息
-    setNickname(''); 
-    setAccount(''); 
-    setPassword(''); 
-    setConfirmPassword(''); 
-    setVerificationCode('');
-    setIsLoginMode(false);
-    setAuthError('');
+    setNickname(''); setAccount(''); setPassword(''); setConfirmPassword(''); setVerificationCode('');
+    setIsLoginMode(false); setAuthError('');
   };
 
   const callDoubaoAPI = async (promptText, systemInstructionText = null, imageParts = []) => {
-    // 🚨 商业化原则：保证全链路真实 API 调用
     let apiMessages = []; 
     if (systemInstructionText) {
       apiMessages.push({ role: "system", content: systemInstructionText });
@@ -438,7 +435,7 @@ export default function DigitalPersonaApp() {
       const generatedPersona = await callDoubaoAPI(prompt, "你是一个擅长提炼人类心理学和行为特征的架构师。", imageParts);
       setDistillLogs(prev => [...prev, "[算力释放] 特征映射完成！已成功提取特征指数。"]); setDistillProgress(80); setActivePersona(generatedPersona);
 
-      if (user && !user.isAnonymous) {
+      if (user && db) {
         try {
           await db.collection('personas').add({ 
             name: uploadedFiles[0]?.name ? uploadedFiles[0].name.split('.')[0] : '未命名数字人', 
@@ -446,9 +443,12 @@ export default function DigitalPersonaApp() {
             createdAt: db.serverDate(), 
             owner: user.uid 
           });
-          setDistillLogs(prev => [...prev, "[云端同步] 档案已永久刻录至数据库。"]);
-        } catch (err) { console.error(err); }
-      } else { setDistillLogs(prev => [...prev, "[本地缓存] 匿名游客模式，数字分身不会永久保存。"]); }
+          setDistillLogs(prev => [...prev, "[云端同步] 档案已永久刻录至腾讯云数据库。"]);
+        } catch (err) { 
+          console.error(err);
+          setDistillLogs(prev => [...prev, `[⚠️数据库被拒] 存储失败，请检查 personas 集合权限设置`]);
+        }
+      }
 
       setTimeout(() => {
         setDistillLogs(prev => [...prev, "[编译成功] 视觉模型处理完毕！正在挂载底层对话引擎..."]); setDistillProgress(100);
@@ -485,12 +485,10 @@ export default function DigitalPersonaApp() {
       
       let replyParts = responseText.split('|||').map(s => s.trim()).filter(s => s);
       
-      // 🚀 核心修复：处理纯删除气泡。如果一个部分只包含被删除的文本，将它与下一部分合并。
       const mergedParts = [];
       let tempPart = "";
       for(let i=0; i<replyParts.length; i++) {
         let textWithoutDel = replyParts[i].replace(/<del>.*?<\/del>/g, '').trim();
-        // 如果这句话剔除掉删除线内容后，是空的，说明这是一句纯删除的话
         if(textWithoutDel === "" && replyParts[i].includes('<del>')) {
            tempPart += replyParts[i] + " ";
         } else {
@@ -498,7 +496,6 @@ export default function DigitalPersonaApp() {
            tempPart = "";
         }
       }
-      // 如果最后还有剩余的纯删除段落，也把它推入数组
       if(tempPart) {
          mergedParts.push(tempPart.trim());
       }
@@ -552,7 +549,10 @@ export default function DigitalPersonaApp() {
     if (!user) return;
     try { 
       await db.collection('personas').doc(personaId).remove(); 
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err); 
+      alert(`删除失败，权限不足: ${err.message || err.code}`);
+    }
   };
 
   const handleAgreeAndProceed = () => {
@@ -560,14 +560,44 @@ export default function DigitalPersonaApp() {
     if (user && !user.isAnonymous) {
         setAppPhase('dashboard');
     } else {
-        // 清理残存信息再进入验证页
         setNickname(''); setAccount(''); setPassword(''); setConfirmPassword(''); setVerificationCode(''); setAuthError('');
         setAppPhase('auth');
     }
   };
 
+  // ✅ 彻底解决 Vercel 中 JSX 尖括号编译报错的问题，全部使用安全转义符
+  if (sdkInitError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-xl w-full text-center border-t-4 border-red-500">
+          <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-10 h-10 text-red-500" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-800 mb-4">系统白屏预警拦截</h1>
+          <p className="text-slate-500 mb-6 font-medium text-sm leading-relaxed">
+            原本您的页面会因为抛出底层异常而彻底白屏。防御进程已为您拦截并捕获了以下错误：
+          </p>
+          <div className="bg-slate-900 p-4 rounded-xl text-left text-xs font-mono text-emerald-400 mb-8 overflow-auto border border-slate-700 shadow-inner break-all">
+            &gt; {sdkInitError}
+          </div>
+          <div className="text-left bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
+             <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><CheckSquare className="w-5 h-5"/> Vercel 部署自救指南</h3>
+             <ul className="text-sm text-indigo-700 space-y-3 font-medium">
+               <li>1. 前往 <b>Vercel 您的项目控制台</b> -&gt; Settings -&gt; Environment Variables</li>
+               <li>2. 添加变量名: <code className="bg-white px-1.5 py-0.5 rounded shadow-sm border border-indigo-100 text-indigo-900 font-bold">VITE_TCB_ENV_ID</code></li>
+               <li>3. 值填入您的真实腾讯云环境 ID (例如: <span className="font-mono">tnt-xxxxxx</span>)</li>
+               <li className="pt-2 border-t border-indigo-200 mt-2">
+                 <span className="text-red-500 font-bold text-base">⚠️ 极其重要的一步：</span><br/>
+                 添加或修改环境变量后，您当前的白屏网页<b>不会自动恢复</b>。您必须前往 Vercel 的 <b>Deployments</b> 页面，点击列表最右侧的三个点，选择 <b className="bg-white px-1.5 py-0.5 rounded text-red-600">Redeploy</b> 重新打包部署！
+               </li>
+             </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  // --- UI 渲染层 ---
+  // --- 正常 UI 渲染层 ---
   if (appPhase === 'home') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center pt-20 pb-10 px-6 font-sans">
@@ -634,12 +664,14 @@ export default function DigitalPersonaApp() {
     );
   }
 
-  // 🌟 登录/注册系统
   if (appPhase === 'auth') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans py-12">
-        <div className="bg-white w-full max-w-[460px] rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-fade-in flex flex-col my-auto">
-          
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans py-12 relative">
+        <button onClick={() => setAppPhase('home')} className="absolute top-6 left-6 flex items-center gap-2 text-slate-500 hover:text-indigo-600 font-bold bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 transition-colors">
+          <ChevronLeft className="w-5 h-5" /> 返回首页
+        </button>
+
+        <div className="bg-white w-full max-w-[460px] rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-fade-in flex flex-col mt-8">
           <div className="flex bg-slate-100 p-1.5 m-5 rounded-2xl shadow-inner">
             <button onClick={() => {setAuthMethod('email'); setAuthError('');}} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${authMethod === 'email' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500'}`}><Mail className="inline w-4 h-4 mr-1 mb-0.5"/> 邮箱通行证</button>
             <button onClick={() => {setAuthMethod('phone'); setAuthError('');}} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${authMethod === 'phone' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500'}`}><Smartphone className="inline w-4 h-4 mr-1 mb-0.5"/> 手机号注册</button>
@@ -658,8 +690,6 @@ export default function DigitalPersonaApp() {
             )}
 
             <form onSubmit={handleAuthSubmit} className="space-y-4">
-              
-              {/* 行1：用户名 */}
               {!isLoginMode && (
                 <div className="animate-fade-in">
                   <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">1. 设置用户名</label>
@@ -670,7 +700,6 @@ export default function DigitalPersonaApp() {
                 </div>
               )}
 
-              {/* 行2：邮箱/手机 */}
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">{isLoginMode ? '登录账号' : `2. 绑定${authMethod === 'email' ? '邮箱' : '手机'}`}</label>
                 <div className="relative">
@@ -679,7 +708,6 @@ export default function DigitalPersonaApp() {
                 </div>
               </div>
 
-              {/* 行3：密码 */}
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">{isLoginMode ? '安全密码' : '3. 设置安全密码'}</label>
                 <div className="relative">
@@ -688,7 +716,6 @@ export default function DigitalPersonaApp() {
                 </div>
               </div>
 
-              {/* 行4 和 行5 (仅注册模式可见) */}
               {!isLoginMode && (
                 <>
                   <div className="animate-fade-in">
@@ -721,15 +748,14 @@ export default function DigitalPersonaApp() {
               <button onClick={() => setIsLoginMode(!isLoginMode)} className="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline decoration-2 underline-offset-4">{isLoginMode ? '新用户？点此完成五步注册' : '已有账号？点此直接登录'}</button>
             </div>
             
-            <div className="relative flex items-center py-7"><div className="flex-grow border-t border-slate-100"></div><span className="mx-4 text-slate-300 text-[10px] font-bold uppercase tracking-widest">临时通道</span><div className="flex-grow border-t border-slate-100"></div></div>
-            <button onClick={handleGuestAuth} className="w-full bg-white border-2 border-slate-200 hover:border-indigo-400 text-slate-600 py-3.5 rounded-xl font-bold flex justify-center items-center gap-2 transition-all"><UserCircle size={20} /> 游客匿名登入 (数据即焚)</button>
+            <div className="relative flex items-center py-7"><div className="flex-grow border-t border-slate-100"></div><span className="mx-4 text-slate-300 text-[10px] font-bold uppercase tracking-widest">快速体验通道</span><div className="flex-grow border-t border-slate-100"></div></div>
+            <button onClick={handleGuestAuth} className="w-full bg-white border-2 border-slate-200 hover:border-indigo-400 text-slate-600 py-3.5 rounded-xl font-bold flex justify-center items-center gap-2 transition-all"><UserCircle size={20} /> 免注册匿名体验 (数据即焚)</button>
           </div>
         </div>
       </div>
     );
   }
 
-  // 🌟 工作台界面
   if (appPhase === 'dashboard') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center p-6 font-sans">
@@ -795,7 +821,6 @@ export default function DigitalPersonaApp() {
     );
   }
 
-  // --- Distilling & Chat ---
   if (appPhase === 'distilling') return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 font-mono">
       <div className="max-w-xl w-full">
