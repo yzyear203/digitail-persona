@@ -37,14 +37,14 @@ const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
     const actions = [];
     
     // 根据性格设定打字速度
-    let baseSpeed = 220; 
-    let deleteSpeed = 80;
+    let baseSpeed = 110; 
+    let deleteSpeed = 40;
     if (persona.includes('细腻') || persona.includes('犹豫') || persona.includes('慢') || persona.includes('斟酌')) {
-      baseSpeed = 400; 
-      deleteSpeed = 120;
+      baseSpeed = 200; 
+      deleteSpeed = 60;
     } else if (persona.includes('急躁') || persona.includes('快') || persona.includes('心直口快')) {
-      baseSpeed = 120; 
-      deleteSpeed = 40;
+      baseSpeed = 60; 
+      deleteSpeed = 20;
     }
 
     // 解析 <del> 标签，将其转化为真实的“退格删字”动作队列
@@ -200,7 +200,7 @@ export default function DigitalPersonaApp() {
       }
       
       setCountdown(60);
-      alert(`✅ 验证码已成功发送至：${account}\n(请注意检查您的收件箱和垃圾箱)`);
+      alert(`✅ 验证码已成功发送至：${account}\n(请注意检查您的收件箱)`);
     } catch (err) {
       console.error("验证码发送异常:", err);
       setAuthError("发送失败: " + (err.message || "请检查邮箱格式或后台服务"));
@@ -348,17 +348,6 @@ export default function DigitalPersonaApp() {
   // --- API 通信底层 ---
   const callDoubaoAPI = async (promptText, systemInstructionText = null, imageParts = []) => {
     
-   
-    const isSandboxEnv = false; 
-
-    if (isSandboxEnv) {
-      await new Promise(res => setTimeout(res, 1200)); 
-      if (promptText.includes("用户上传了上述包含真实聊天记录")) {
-         return "我是一个被提取出来的分身。<del>虽然我并不想工作。</del> 打字速度：慢；删改频率：高。";
-      }
-      return `好的，我收到你的消息了。|||<del>怎么这么多事，</del>我等会帮你弄。|||不过可能得等一会。`;
-    } 
-    
     // --- 以下为真实环境后端 Fetch ---
     let messages = []; if (systemInstructionText) messages.push({ role: "system", content: systemInstructionText });
     let userContent = [];
@@ -417,7 +406,15 @@ export default function DigitalPersonaApp() {
       setDistillLogs(prev => [...prev, `[解析层] 成功加载 ${imageParts.length} 张图片(已压缩) 和 ${textContents.length > 0 ? '文本数据' : '0 份文本'}。`]); setDistillProgress(25);
       setTimeout(() => { setDistillLogs(prev => [...prev, "[深度推理] 注入视觉大模型，执行深度 OCR 与排版提炼..."]); setDistillProgress(50); }, 1000);
 
-      let prompt = `用户上传了上述真实聊天截图。请提炼出：1. 核心性格。2. 口头禅。3. 连发条数边界。4. 打字犹豫特征。`;
+      let prompt = `用户上传了上述包含真实聊天记录或备忘录内容的图片/截图。
+请你利用视觉理解和 OCR 能力，阅读图片中的对话内容。
+你需要根据这些最真实的原始文本，提炼出这个人的数字人格设定。
+请用第一人称（“我”）来回答，包含以下必须项：
+1. 核心性格与沟通风格。
+2. 常用的口头禅或惯用语（摘抄原话）。
+3. 展现出的处理事务逻辑。
+4. 发消息的节奏风格。
+5. 连发条数心理边界（如：习惯连续发 2-4 条，或者 4-8 条）。必须在设定中明确写出数字范围！`;
       if (textContents) prompt = `参考文本文档内容：\n\n${textContents}\n\n` + prompt;
       if (imageParts.length === 0 && !textContents) prompt = "用户未上传有效素材，请随机生成一个标准的AI助手人格设定。";
 
