@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Trash2, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X, Mail, Smartphone, Lock, User, Hash, ChevronLeft } from 'lucide-react';
 
-// 引入本地安装的腾讯云开发 SDK
-import cloudbase from '@cloudbase/js-sdk';
+// 为了在当前在线沙盒环境中正常编译预览，这里临时使用 ESM 链接引入
+// 当您复制到本地项目时，请将其改回: import cloudbase from '@cloudbase/js-sdk';
+import cloudbase from 'https://esm.sh/@cloudbase/js-sdk';
 
 // 🚀 系统级防白屏拦截机制
 let tcb = null;
@@ -25,7 +26,7 @@ try {
   sdkInitError = err.message;
 }
 
-// 🌟 满血版真实人类打字机引擎 (带全局阻塞回调，彻底解决多条齐发 Bug)
+// 🌟 满血版真实人类打字机引擎
 const SimulatedTypingText = ({ content, persona, onComplete, scrollRef }) => {
   const [displayText, setDisplayText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
@@ -153,11 +154,11 @@ export default function DigitalPersonaApp() {
   const [distillLogs, setDistillLogs] = useState([]);
   const [activePersona, setActivePersona] = useState("你是一个乐于助人的 AI 助手。"); 
 
-  // 🚀 全局 Toast 提示，彻底取代 alert()
+  // 全局 Toast 提示
   const [sysMessage, setSysMessage] = useState('');
   const showMsg = (msg) => {
     setSysMessage(msg);
-    setTimeout(() => setSysMessage(''), 4000);
+    setTimeout(() => setSysMessage(''), 4500);
   };
 
   const messagesEndRef = useRef(null);
@@ -176,6 +177,7 @@ export default function DigitalPersonaApp() {
     return () => clearInterval(timer);
   }, [countdown]);
 
+  // 🚀 核心修复：彻底放开限制，完全信任您的配置，调用邮箱/手机发码接口
   const handleSendCode = async () => {
     if (!account) {
       setAuthError(`请先填写您的${authMethod === 'email' ? '邮箱' : '手机号'}`);
@@ -184,36 +186,32 @@ export default function DigitalPersonaApp() {
     setAuthError('');
     try {
       if (authMethod === 'email') {
-        if (auth && auth.sendEmailCode) {
-           await auth.sendEmailCode(account);
-           setCountdown(60);
-           showMsg(`✅ 验证码下发请求已处理，请注意查收邮件：${account}`);
-        } else {
-           throw new Error("当前系统环境暂未配置邮箱验证码发送功能，请检查后端设置。");
-        }
+        // 调用发送邮箱验证码的底层接口
+        await auth.sendEmailCode(account);
+        setCountdown(60);
+        showMsg(`✅ 验证码下发请求已处理，请注意查收邮件：${account}`);
       } else {
-        if (auth && auth.sendPhoneCode) {
-            await auth.sendPhoneCode(account);
-            setCountdown(60);
-            showMsg(`✅ 验证码已发送至：${account}`);
-        } else {
-            throw new Error("当前系统暂未配置手机验证码发送功能");
-        }
+        await auth.sendPhoneCode(account);
+        setCountdown(60);
+        showMsg(`✅ 验证码已发送至手机：${account}`);
       }
     } catch (err) {
-      setAuthError("发送失败: " + (err.message || err.code || "请检查账号格式"));
+      // 捕捉并打印真实的后端错误
+      console.error("验证码发送拦截日志:", err);
+      let errMsg = err.message || err.code || "发送失败";
+      if (errMsg.includes("not a function")) {
+          errMsg = "您的云开发 SDK 版本不支持此发码方法，请检查版本或依赖";
+      }
+      setAuthError("发送失败: " + errMsg);
     }
   };
 
   useEffect(() => {
     if (!auth || !db) return;
 
-    // 🚀 核心：强力数据库写入层
     const loadUserProfile = async (uid, email, isAnon) => {
       try {
-        // 在 PRIVATE 权限下，这里只会拉取到属于当前登录用户的数据
         const res = await db.collection('users').where({ uid: String(uid) }).get();
-        
         if (res.data && res.data.length > 0) {
           console.log("✅ [数据库] 云端已存在档案，加载成功", res.data[0]);
           setUserProfile(res.data[0]); 
@@ -226,13 +224,11 @@ export default function DigitalPersonaApp() {
             email: email || 'anonymous@demo.com', 
             nickname: finalNickname, 
             shortId: generateUniqueId(), 
-            createdAt: Date.now() // 使用标准的毫秒时间戳防止解析错误
+            createdAt: Date.now() 
           };
           
-          // 执行直接写入操作，腾讯云会自动为这条记录附加此用户的 _openid
           const addRes = await db.collection('users').add(newProfile);
           console.log("🔥 [数据库] 写入大获成功！Document ID:", addRes.id);
-          
           setUserProfile(newProfile);
           localStorage.removeItem('temp_nickname'); 
         }
@@ -264,7 +260,6 @@ export default function DigitalPersonaApp() {
   useEffect(() => {
     if (!auth || !db || !user) return; 
     
-    // 监听当前用户的私有 personas 集合，[PRIVATE] 权限下天然安全
     const watcher = db.collection('personas').where({ owner: String(user.uid) }).watch({
         onChange: (snapshot) => {
           const loaded = [];
@@ -301,16 +296,22 @@ export default function DigitalPersonaApp() {
         localStorage.setItem('temp_nickname', nickname.trim());
         
         if (authMethod === 'email') {
-           if (auth.signUpWithEmailCode) {
-               await auth.signUpWithEmailCode(account, password, verificationCode);
-           } else {
-               throw new Error("未开启邮箱验证码注册，请检查后端配置");
+           // 邮箱 + 验证码注册
+           try {
+             await auth.signUpWithEmailCode(account, password, verificationCode);
+           } catch (innerErr) {
+             // 兼容某些非常规 SDK 写法，如果 signUpWithEmailCode 不存在则抛错
+             if(innerErr instanceof TypeError) {
+                 await auth.signUpWithEmailAndPassword(account, password, verificationCode);
+             } else {
+                 throw innerErr;
+             }
            }
            try { await auth.signInWithEmailAndPassword(account, password); } catch(e) {}
            showMsg("🎉 账号创建成功！\n您的专属数字档案已在云端建立。");
            setAppPhase('dashboard');
         } else {
-           // 手机号注册
+           // 手机号 + 验证码注册
            await auth.signUpWithPhoneCode(account, password, verificationCode);
            try { await auth.signInWithEmailAndPassword(account, password); } catch(e) {}
            showMsg("🎉 手机账号创建成功！");
@@ -328,7 +329,7 @@ export default function DigitalPersonaApp() {
       const rawMsg = err.message || err.code || (typeof err === 'object' ? JSON.stringify(err) : String(err));
       const msg = rawMsg.toLowerCase();
       
-      if (msg.includes('用户名') || msg.includes('两次输入') || msg.includes('手机验证')) errorMsg = err.message;
+      if (msg.includes('用户名') || msg.includes('两次输入') || msg.includes('验证码') || msg.includes('格式')) errorMsg = err.message;
       else if (msg.includes('password') || msg.includes('密码')) errorMsg = '安全密码错误或不符合规范！';
       else if (msg.includes('exist') || msg.includes('not found') || msg.includes('未注册')) errorMsg = '账号未注册，请点击下方切换至注册模式。';
       else if (msg.includes('email') && msg.includes('already')) errorMsg = '该账号已被注册，请直接点击下方“返回登录”。';
@@ -752,6 +753,7 @@ export default function DigitalPersonaApp() {
                       </div>
                     </div>
 
+                    {/* 强制验证区：无论是邮箱还是手机号，此处输入框都坚定地展示并要求用户验证 */}
                     <div className="animate-fade-in pb-2">
                       <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">5. 身份验证码</label>
                       <div className="relative flex items-center">
@@ -771,7 +773,7 @@ export default function DigitalPersonaApp() {
               </form>
 
               <div className="text-center mt-6">
-                <button onClick={() => setIsLoginMode(!isLoginMode)} className="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline decoration-2 underline-offset-4">{isLoginMode ? '新用户？点此完成五步注册' : '已有账号？点此直接登录'}</button>
+                <button onClick={() => setIsLoginMode(!isLoginMode)} className="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline decoration-2 underline-offset-4">{isLoginMode ? '新用户？点此完成注册' : '已有账号？点此直接登录'}</button>
               </div>
               
               <div className="relative flex items-center py-7"><div className="flex-grow border-t border-slate-100"></div><span className="mx-4 text-slate-300 text-[10px] font-bold uppercase tracking-widest">快速体验通道</span><div className="flex-grow border-t border-slate-100"></div></div>
