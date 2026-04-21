@@ -607,44 +607,44 @@ export default function DigitalPersonaApp() {
                  <span className="text-red-500 font-bold text-base">⚠️ 极其重要的一步：</span><br/>
                  添加或修改环境变量后，您当前的白屏网页<b>不会自动恢复</b>。您必须前往 Vercel 的 <b>Deployments</b> 页面，点击列表最右侧的三个点，选择 <b className="bg-white px-1.5 py-0.5 rounded text-red-600">Redeploy</b> 重新打包部署！
                </li>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">{isLoginMode ? '安全密码' : '3. 设置安全密码'}</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-3.5 text-slate-400" size={20}/>
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength="6" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 outline-none font-bold" placeholder="至少输入 6 位" />
-                </div>
-              </div>
+             </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-              {!isLoginMode && (
-                <>
-                  <div className="animate-fade-in">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">4. 再次确认密码</label>
-                    <div className="relative">
-                      <ShieldCheck className={`absolute left-4 top-3.5 ${confirmPassword && confirmPassword === password ? 'text-emerald-500' : 'text-slate-400'}`} size={20}/>
-                      <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required className={`w-full bg-slate-50 border ${confirmPassword && confirmPassword !== password ? 'border-red-400' : 'border-slate-200'} rounded-xl pl-12 pr-4 py-3.5 focus:ring-2 outline-none font-bold`} placeholder="确保密码输入一致" />
-                    </div>
-                  </div>
+  return (
+    <>
+      {/* 🚀 全局 UI Toast 提示层，安全替代原生 alert */}
+      {sysMessage && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[999] bg-slate-800/95 backdrop-blur-md text-white px-6 py-4 rounded-2xl shadow-2xl animate-fade-in flex items-start gap-4 max-w-sm w-full border border-slate-600/50">
+           <Info className="w-6 h-6 text-indigo-400 shrink-0 mt-0.5" />
+           <span className="font-medium text-sm whitespace-pre-wrap leading-relaxed">{sysMessage}</span>
+           <button onClick={() => setSysMessage('')} className="ml-auto opacity-50 hover:opacity-100 mt-1 shrink-0"><X className="w-4 h-4"/></button>
+        </div>
+      )}
 
-                  <div className="animate-fade-in pb-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">5. 身份验证码</label>
-                    <div className="relative flex items-center">
-                      <Hash className="absolute left-4 top-3.5 text-slate-400" size={20}/>
-                      <input type="text" value={verificationCode} onChange={e => setVerificationCode(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-32 py-3.5 focus:ring-2 focus:ring-indigo-500 outline-none font-bold tracking-widest" placeholder={`输入 6 位${authMethod === 'email' ? '邮箱' : '手机'}验证码`} />
-                      <button type="button" onClick={handleSendCode} disabled={countdown > 0} className={`absolute right-2 py-2 px-3 text-xs font-bold rounded-lg ${countdown > 0 ? 'text-slate-400 cursor-not-allowed bg-slate-100' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100'}`}>
-                        {countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <button type="submit" disabled={isAuthenticating || (!isLoginMode && password !== confirmPassword)} className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold text-lg flex justify-center items-center shadow-lg shadow-indigo-100 transition-all transform hover:-translate-y-0.5">
-                {isAuthenticating ? <Loader2 className="w-6 h-6 animate-spin" /> : <span>{isLoginMode ? '安全登入' : '提交注册并分配 UID'}</span>}
-              </button>
-            </form>
-
-            <div className="text-center mt-6">
-              <button onClick={() => setIsLoginMode(!isLoginMode)} className="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline decoration-2 underline-offset-4">{isLoginMode ? '新用户？点此完成五步注册' : '已有账号？点此直接登录'}</button>
+      {/* --- 首页层 --- */}
+      {appPhase === 'home' && (
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center pt-20 pb-10 px-6 font-sans">
+          <div className="bg-indigo-100 text-indigo-800 px-4 py-2 text-xs flex items-center justify-center space-x-2 rounded-full mb-12 shadow-sm border border-indigo-200">
+            <ShieldCheck className="w-4 h-4" />
+            <span className="font-bold">2026 合规运作中</span>
+            <span>已接入公安部算力备案网络及 PIPL 隐私保护层</span>
+          </div>
+          <div className="max-w-5xl w-full text-center mb-16">
+            <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-6">
+              Identity as a Skill (IaaS)<br/><span className="text-indigo-600">数字资产编译器</span>
+            </h1>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed font-medium">基于多模态双擎驱动。只需上传对话片段，即刻提取记忆、经验与思考模型，生成具备灵魂的数字分身。</p>
+          </div>
+          <div className="max-w-5xl w-full grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col">
+              <div className="bg-amber-100 w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><BookOpen className="w-7 h-7 text-amber-600" /></div>
+              <h3 className="text-xl font-bold text-slate-800 mb-3">名人人格/思想库</h3>
+              <p className="text-sm text-slate-500 mb-8 flex-1 leading-relaxed font-medium">连接公共版权领域的专家、名人思想数据库（如鲁迅选集、乔布斯访谈录），进行沉浸式的互动知识学习。</p>
+              <button onClick={() => showMsg('提示：【名人库】需要对接公共版权平台 API，当前为演示环境。')} className="w-full py-3.5 rounded-xl font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors">进入版权库</button>
             </div>
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm hover:shadow-xl transition-all group flex flex-col">
               <div className="bg-emerald-100 w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><Briefcase className="w-7 h-7 text-emerald-600" /></div>
@@ -718,33 +718,60 @@ export default function DigitalPersonaApp() {
               <form onSubmit={handleAuthSubmit} className="space-y-4">
                 {!isLoginMode && (
                   <div className="animate-fade-in">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">4. 再次确认密码</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">1. 设置用户名</label>
                     <div className="relative">
-                      <ShieldCheck className={`absolute left-4 top-3.5 ${confirmPassword && confirmPassword === password ? 'text-emerald-500' : 'text-slate-400'}`} size={20}/>
-                      <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required className={`w-full bg-slate-50 border ${confirmPassword && confirmPassword !== password ? 'border-red-400' : 'border-slate-200'} rounded-xl pl-12 pr-4 py-3.5 focus:ring-2 outline-none font-bold`} placeholder="确保密码输入一致" />
+                      <User className="absolute left-4 top-3.5 text-slate-400" size={20}/>
+                      <input type="text" value={nickname} onChange={e => setNickname(e.target.value)} required minLength="2" maxLength="12" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 outline-none font-bold" placeholder="给自己取个昵称" />
                     </div>
                   </div>
+                )}
 
-                  <div className="animate-fade-in pb-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">5. 身份验证码</label>
-                    <div className="relative flex items-center">
-                      <Hash className="absolute left-4 top-3.5 text-slate-400" size={20}/>
-                      <input type="text" value={verificationCode} onChange={e => setVerificationCode(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-32 py-3.5 focus:ring-2 focus:ring-indigo-500 outline-none font-bold tracking-widest" placeholder={`输入 6 位${authMethod === 'email' ? '邮箱' : '手机'}验证码`} />
-                      <button type="button" onClick={handleSendCode} disabled={countdown > 0} className={`absolute right-2 py-2 px-3 text-xs font-bold rounded-lg ${countdown > 0 ? 'text-slate-400 cursor-not-allowed bg-slate-100' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100'}`}>
-                        {countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}
-                      </button>
-                    </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">{isLoginMode ? '登录账号' : `2. 绑定${authMethod === 'email' ? '邮箱' : '手机'}`}</label>
+                  <div className="relative">
+                    {authMethod === 'email' ? <Mail className="absolute left-4 top-3.5 text-slate-400" size={20}/> : <Smartphone className="absolute left-4 top-3.5 text-slate-400" size={20}/>}
+                    <input type={authMethod === 'email' ? "email" : "text"} value={account} onChange={e => setAccount(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 outline-none font-bold" placeholder={authMethod === 'email' ? "输入常用邮箱" : "输入手机号"} />
                   </div>
-                </>
-              )}
+                </div>
 
-              <button type="submit" disabled={isAuthenticating || (!isLoginMode && password !== confirmPassword)} className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold text-lg flex justify-center items-center shadow-lg shadow-indigo-100 transition-all transform hover:-translate-y-0.5">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">{isLoginMode ? '安全密码' : '3. 设置安全密码'}</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-3.5 text-slate-400" size={20}/>
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength="6" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 outline-none font-bold" placeholder="至少输入 6 位" />
+                  </div>
+                </div>
+
+                {!isLoginMode && (
+                  <>
+                    <div className="animate-fade-in">
+                      <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">4. 再次确认密码</label>
+                      <div className="relative">
+                        <ShieldCheck className={`absolute left-4 top-3.5 ${confirmPassword && confirmPassword === password ? 'text-emerald-500' : 'text-slate-400'}`} size={20}/>
+                        <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required className={`w-full bg-slate-50 border ${confirmPassword && confirmPassword !== password ? 'border-red-400' : 'border-slate-200'} rounded-xl pl-12 pr-4 py-3.5 focus:ring-2 outline-none font-bold`} placeholder="确保密码输入一致" />
+                      </div>
+                    </div>
+
+                    <div className="animate-fade-in pb-2">
+                      <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">5. 身份验证码</label>
+                      <div className="relative flex items-center">
+                        <Hash className="absolute left-4 top-3.5 text-slate-400" size={20}/>
+                        <input type="text" value={verificationCode} onChange={e => setVerificationCode(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-32 py-3.5 focus:ring-2 focus:ring-indigo-500 outline-none font-bold tracking-widest" placeholder={`输入 6 位${authMethod === 'email' ? '邮箱' : '手机'}验证码`} />
+                        <button type="button" onClick={handleSendCode} disabled={countdown > 0} className={`absolute right-2 py-2 px-3 text-xs font-bold rounded-lg ${countdown > 0 ? 'text-slate-400 cursor-not-allowed bg-slate-100' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100'}`}>
+                          {countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <button type="submit" disabled={isAuthenticating || (!isLoginMode && password !== confirmPassword)} className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold text-lg flex justify-center items-center shadow-lg shadow-indigo-100 transition-all transform hover:-translate-y-0.5">
                   {isAuthenticating ? <Loader2 className="w-6 h-6 animate-spin" /> : <span>{isLoginMode ? '安全登入' : '提交注册并分配 UID'}</span>}
                 </button>
               </form>
 
               <div className="text-center mt-6">
-                <button onClick={() => setIsLoginMode(!isLoginMode)} className="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline decoration-2 underline-offset-4">{isLoginMode ? '新用户？点此极速注册' : '已有账号？点此直接登录'}</button>
+                <button onClick={() => setIsLoginMode(!isLoginMode)} className="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline decoration-2 underline-offset-4">{isLoginMode ? '新用户？点此完成五步注册' : '已有账号？点此直接登录'}</button>
               </div>
               
               <div className="relative flex items-center py-7"><div className="flex-grow border-t border-slate-100"></div><span className="mx-4 text-slate-300 text-[10px] font-bold uppercase tracking-widest">快速体验通道</span><div className="flex-grow border-t border-slate-100"></div></div>
