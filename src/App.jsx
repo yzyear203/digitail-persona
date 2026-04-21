@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Trash2, Info, Send, AlertTriangle, UserCircle, Key, Sparkles, CheckSquare, UploadCloud, ArrowRight, Loader2, Terminal, FileText, Image as ImageIcon, BookOpen, Briefcase, Wand2, Scale, FileSignature, Database, LogOut, X, Mail, Smartphone, Lock, User, Hash, ChevronLeft } from 'lucide-react';
 
-// 为了在当前在线沙盒环境中正常编译预览，这里临时使用 ESM 链接引入
-// 当您复制到本地项目时，请将其改回: import cloudbase from '@cloudbase/js-sdk';
-import cloudbase from 'https://esm.sh/@cloudbase/js-sdk';
+// 引入本地安装的腾讯云开发 SDK (为了当前沙盒预览，使用 ESM 链接)
+import cloudbase from '@cloudbase/js-sdk';
 
 // 🚀 系统级防白屏拦截机制
 let tcb = null;
@@ -177,7 +176,7 @@ export default function DigitalPersonaApp() {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  // 🚀 核心修复：彻底放开限制，完全信任您的配置，调用邮箱/手机发码接口
+  // 🚀 核心修复：彻底删掉之前画蛇添足的拦截，直接调用原生 SDK 接口！
   const handleSendCode = async () => {
     if (!account) {
       setAuthError(`请先填写您的${authMethod === 'email' ? '邮箱' : '手机号'}`);
@@ -186,23 +185,19 @@ export default function DigitalPersonaApp() {
     setAuthError('');
     try {
       if (authMethod === 'email') {
-        // 调用发送邮箱验证码的底层接口
+        // 直接执行邮箱验证码发送
         await auth.sendEmailCode(account);
         setCountdown(60);
         showMsg(`✅ 验证码下发请求已处理，请注意查收邮件：${account}`);
       } else {
+        // 直接执行手机验证码发送
         await auth.sendPhoneCode(account);
         setCountdown(60);
         showMsg(`✅ 验证码已发送至手机：${account}`);
       }
     } catch (err) {
-      // 捕捉并打印真实的后端错误
-      console.error("验证码发送拦截日志:", err);
-      let errMsg = err.message || err.code || "发送失败";
-      if (errMsg.includes("not a function")) {
-          errMsg = "您的云开发 SDK 版本不支持此发码方法，请检查版本或依赖";
-      }
-      setAuthError("发送失败: " + errMsg);
+      console.error("发码真实报错:", err);
+      setAuthError("发送失败: " + (err.message || err.code || "请检查账号格式是否正确"));
     }
   };
 
@@ -213,10 +208,8 @@ export default function DigitalPersonaApp() {
       try {
         const res = await db.collection('users').where({ uid: String(uid) }).get();
         if (res.data && res.data.length > 0) {
-          console.log("✅ [数据库] 云端已存在档案，加载成功", res.data[0]);
           setUserProfile(res.data[0]); 
         } else {
-          console.log("🚀 [数据库] 检测到新用户，准备执行第一次底层直写...");
           const savedNickname = localStorage.getItem('temp_nickname') || (email ? email.split('@')[0] : '云端新用户');
           const finalNickname = isAnon ? '匿名访客' : savedNickname;
           const newProfile = { 
@@ -227,14 +220,13 @@ export default function DigitalPersonaApp() {
             createdAt: Date.now() 
           };
           
-          const addRes = await db.collection('users').add(newProfile);
-          console.log("🔥 [数据库] 写入大获成功！Document ID:", addRes.id);
+          await db.collection('users').add(newProfile);
           setUserProfile(newProfile);
           localStorage.removeItem('temp_nickname'); 
         }
       } catch (err) { 
         console.error("❌ 数据库读写被拦截:", err); 
-        showMsg(`⛔ 数据库连接或权限异常！\n错误详情: ${err.message || err.code}\n👉 请确保云端 users 集合权限已设为 [PRIVATE]！`);
+        showMsg(`⛔ 数据库连接异常！\n错误详情: ${err.message || err.code}\n请确保云端 users 集合权限已设为 [PRIVATE]！`);
       }
     };
 
@@ -282,13 +274,12 @@ export default function DigitalPersonaApp() {
 
     try {
       if (!isLoginMode) {
-        // --- 注册逻辑 ---
         if (!nickname.trim()) throw new Error("请填写您的用户名");
         if (!account.trim()) throw new Error(`请填写您的${authMethod === 'email' ? '邮箱' : '手机号'}`);
         if (password.length < 6) throw new Error("密码至少需要 6 位字符");
         if (password !== confirmPassword) throw new Error("两次输入的密码不一致！");
         
-        // 🚀 强制所有注册方式必须校验验证码
+        // 强制要求填写验证码
         if (!verificationCode.trim()) {
            throw new Error(`请输入您收到的${authMethod === 'email' ? '邮箱' : '手机'}验证码`);
         }
@@ -296,29 +287,19 @@ export default function DigitalPersonaApp() {
         localStorage.setItem('temp_nickname', nickname.trim());
         
         if (authMethod === 'email') {
-           // 邮箱 + 验证码注册
-           try {
-             await auth.signUpWithEmailCode(account, password, verificationCode);
-           } catch (innerErr) {
-             // 兼容某些非常规 SDK 写法，如果 signUpWithEmailCode 不存在则抛错
-             if(innerErr instanceof TypeError) {
-                 await auth.signUpWithEmailAndPassword(account, password, verificationCode);
-             } else {
-                 throw innerErr;
-             }
-           }
+           // 🚀 核心修复：直接调用邮箱验证码注册接口，不再擅自使用 try-catch fallback
+           await auth.signUpWithEmailCode(account, password, verificationCode);
+           
            try { await auth.signInWithEmailAndPassword(account, password); } catch(e) {}
            showMsg("🎉 账号创建成功！\n您的专属数字档案已在云端建立。");
            setAppPhase('dashboard');
         } else {
-           // 手机号 + 验证码注册
            await auth.signUpWithPhoneCode(account, password, verificationCode);
            try { await auth.signInWithEmailAndPassword(account, password); } catch(e) {}
            showMsg("🎉 手机账号创建成功！");
            setAppPhase('dashboard');
         }
       } else {
-        // --- 登录逻辑 ---
         if (!account.trim() || !password.trim()) throw new Error("请输入账号和密码");
         await auth.signInWithEmailAndPassword(account, password);
         setAppPhase('dashboard');
@@ -329,7 +310,7 @@ export default function DigitalPersonaApp() {
       const rawMsg = err.message || err.code || (typeof err === 'object' ? JSON.stringify(err) : String(err));
       const msg = rawMsg.toLowerCase();
       
-      if (msg.includes('用户名') || msg.includes('两次输入') || msg.includes('验证码') || msg.includes('格式')) errorMsg = err.message;
+      if (msg.includes('用户名') || msg.includes('两次输入') || msg.includes('验证码')) errorMsg = err.message;
       else if (msg.includes('password') || msg.includes('密码')) errorMsg = '安全密码错误或不符合规范！';
       else if (msg.includes('exist') || msg.includes('not found') || msg.includes('未注册')) errorMsg = '账号未注册，请点击下方切换至注册模式。';
       else if (msg.includes('email') && msg.includes('already')) errorMsg = '该账号已被注册，请直接点击下方“返回登录”。';
@@ -753,7 +734,6 @@ export default function DigitalPersonaApp() {
                       </div>
                     </div>
 
-                    {/* 强制验证区：无论是邮箱还是手机号，此处输入框都坚定地展示并要求用户验证 */}
                     <div className="animate-fade-in pb-2">
                       <label className="block text-sm font-bold text-slate-700 mb-1.5 font-mono">5. 身份验证码</label>
                       <div className="relative flex items-center">
